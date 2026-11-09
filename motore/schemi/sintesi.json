@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "properties": {
+    "conclusione": { "type": "string" },
+    "motivazioni": { "type": "array", "items": { "type": "string" } },
+    "decisioni": { "type": "array", "items": { "type": "string" } },
+    "disaccordi": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "punto": { "type": "string" },
+          "posizione_claude": { "type": "string" },
+          "posizione_codex": { "type": "string" }
+        },
+        "required": ["punto", "posizione_claude", "posizione_codex"],
+        "additionalProperties": false
+      }
+    },
+    "prossimi_passi": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["conclusione", "motivazioni", "decisioni", "disaccordi", "prossimi_passi"],
+  "additionalProperties": false
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Contrappunto",
+  "short_name": "Contrappunto",
+  "description": "La chat con Claude e Codex, le partite e la produzione.",
+  "lang": "it",
+  "start_url": "/#/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f7f8f9",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "/icona-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icona-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icona-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

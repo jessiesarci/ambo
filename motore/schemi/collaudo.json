@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "approvato": { "type": "boolean" },
+    "problemi": { "type": "array", "items": { "type": "string" } },
+    "commento": { "type": "string" }
+  },
+  "required": ["approvato", "problemi", "commento"],
+  "additionalProperties": false
+}

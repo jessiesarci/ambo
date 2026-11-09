@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "messaggio": { "type": "string", "description": "Il tuo intervento completo nel dibattito, in markdown" },
+    "stato": { "type": "string", "enum": ["proposta", "accordo", "accordo_parziale", "disaccordo"] },
+    "posizione": { "type": "string", "description": "La tua posizione attuale in 1-3 frasi" },
+    "punti_aperti": { "type": "array", "items": { "type": "string" } },
+    "cambi_di_posizione": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["messaggio", "stato", "posizione", "punti_aperti", "cambi_di_posizione"],
+  "additionalProperties": false
+}

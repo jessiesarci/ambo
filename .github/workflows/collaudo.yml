@@ -1,0 +1,32 @@
+# Collaudo su Windows, macOS e Linux: tipi, test, build, controllo sterile e avvio a vuoto.
+# Non chiama le CLI vere: niente login, niente quota.
+name: collaudo
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  collaudo:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run controllo
+      - name: Avvio a vuoto
+        shell: bash
+        run: |
+          node motore/server.ts > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:4317/api/info > info.json && break; sleep 1; done
+          cat info.json
+          curl -sf -o /dev/null http://127.0.0.1:4317/
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: esterno.example:4317' http://127.0.0.1:4317/api/info)" = "421"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H 'Origin: http://esterno.example' -d '{}' http://127.0.0.1:4317/api/chat)" = "403"

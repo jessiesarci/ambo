@@ -1,0 +1,23 @@
+# Dipendenze e build
+node_modules/
+web/dist/
+
+# Dati di chi usa il programma: chat, partite, cantieri, note salvate, ambiente della voce
+dati/
+
+# Configurazione e profilo personali (i modelli sono .env.esempio e profilo.esempio.md)
+.env
+.env.*
+!.env.esempio
+profilo.md
+
+# Varie
+*.log
+.DS_Store
+Thumbs.db
+
+# Credenziali di strumenti
+.npmrc
+.pypirc
+.netrc
+.git-credentials

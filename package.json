@@ -1,0 +1,50 @@
+{
+  "name": "contrappunto",
+  "version": "0.1.0",
+  "description": "Chatta con Claude Code e Codex insieme, sul tuo PC, con i tuoi abbonamenti. Solo locale.",
+  "type": "module",
+  "private": true,
+  "author": "Jessie Sarcinella",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env motore/server.ts",
+    "server:dev": "node --env-file-if-exists=.env motore/server.ts --dev",
+    "web": "vite --config web/vite.config.ts",
+    "build": "vite build --config web/vite.config.ts",
+    "dibattito": "node --env-file-if-exists=.env motore/cli.ts",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p web",
+    "controllo": "node --env-file-if-exists=.env strumenti/controllo-sterile.ts",
+    "voce:installa": "node --env-file-if-exists=.env strumenti/installa-voce.ts",
+    "prova:pausa": "node --env-file-if-exists=.env test/e2e-pausa.ts"
+  },
+  "dependencies": {
+    "@fontsource/chakra-petch": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
+    "lucide-react": "^1.70.0",
+    "motion": "^14.10.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "three": "^0.187.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.187.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6"
+  }
+}

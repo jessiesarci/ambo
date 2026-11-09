@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "approvata": { "type": "boolean" },
+    "correzioni": { "type": "array", "items": { "type": "string" } },
+    "disaccordi_mancanti": { "type": "array", "items": { "type": "string" } },
+    "commento": { "type": "string" }
+  },
+  "required": ["approvata", "correzioni", "disaccordi_mancanti", "commento"],
+  "additionalProperties": false
+}
