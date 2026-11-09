@@ -11,17 +11,17 @@ const acceso = (v: string | undefined) => v === '1' || v?.toLowerCase() === 'si'
 
 export const IMPOSTAZIONI = {
   // Come gli agenti chiamano chi usa il programma. Vuoto: "l'utente".
-  nome: (process.env.CONTRAPPUNTO_NOME ?? '').replace(/\s+/g, ' ').trim().slice(0, 60) || undefined,
+  nome: (process.env.AMBO_NOME ?? '').replace(/\s+/g, ' ').trim().slice(0, 60) || undefined,
   // Chi sei e come lavori: un file markdown che gli agenti leggono (in sola lettura).
-  profilo: percorso('CONTRAPPUNTO_PROFILO') ?? join(RADICE, 'profilo.md'),
+  profilo: percorso('AMBO_PROFILO') ?? join(RADICE, 'profilo.md'),
   // Una cartella di note markdown da dare in lettura agli agenti (per esempio un vault Obsidian).
-  note: percorso('CONTRAPPUNTO_NOTE'),
+  note: percorso('AMBO_NOTE'),
   // Dove il programma salva decisioni e chat come note markdown. Le rilegge anche, come memoria.
-  salvaIn: percorso('CONTRAPPUNTO_SALVA_IN') ?? join(CARTELLA_DATI, 'note'),
+  salvaIn: percorso('AMBO_SALVA_IN') ?? join(CARTELLA_DATI, 'note'),
   // Claude parte con le impostazioni utente di Claude Code (CLAUDE.md, plugin, skill).
-  ambiente: acceso(process.env.CONTRAPPUNTO_AMBIENTE),
+  ambiente: acceso(process.env.AMBO_AMBIENTE),
   // Accetta anche il login con chiave API, che si paga a consumo. Di serie no.
-  consentiApi: acceso(process.env.CONTRAPPUNTO_CONSENTI_API),
+  consentiApi: acceso(process.env.AMBO_CONSENTI_API),
 };
 
 // Il modo in cui gli agenti nominano chi usa il programma, e la riga che lo presenta.

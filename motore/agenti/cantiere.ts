@@ -65,7 +65,7 @@ export function costruisci(op: OpzioniCantiere): Promise<EsitoCantiere> {
   // Un cantiere dentro una cartella vietata (AppData, .claude...) avrebbe tutte le scritture negate:
   // succede se i dati del programma stanno lì. Meglio dirlo subito che lasciar girare Claude a vuoto.
   const vietata = vietateAlCantiere().find((c) => (radice + sep).toLowerCase().startsWith((resolve(c) + sep).toLowerCase()));
-  if (vietata) return Promise.reject(new ErroreAgente(`Cantiere: la cartella dei dati sta dentro ${vietata}, dove Claude non può scrivere. Sposta CONTRAPPUNTO_DATI in un'altra cartella`, 'strumento', false));
+  if (vietata) return Promise.reject(new ErroreAgente(`Cantiere: la cartella dei dati sta dentro ${vietata}, dove Claude non può scrivere. Sposta AMBO_DATI in un'altra cartella`, 'strumento', false));
   const regola = regolaPercorso(radice);
   const memoria = op.memoria ? STRUMENTI_MEMORIA.claude : [];
   const ammessi = new Set([...FILE, ...memoria]);

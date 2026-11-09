@@ -600,8 +600,8 @@ export function Chat(p: PropsChat) {
   const d = p.vista.dibattito && p.vista.dibattito.id === p.id ? p.vista.dibattito : undefined;
   const messaggi = d?.chat ?? [];
   const [chi, setChi] = useState<Destinatari>('entrambi');
-  const [modoVoce, setModoVoce] = preferenza<ModoVoce>('contrappunto.voce', 'pc');
-  const [leggiSempre, setLeggiSempre] = preferenza<'si' | 'no'>('contrappunto.leggi', 'no');
+  const [modoVoce, setModoVoce] = preferenza<ModoVoce>('ambo.voce', 'pc');
+  const [leggiSempre, setLeggiSempre] = preferenza<'si' | 'no'>('ambo.leggi', 'no');
   const [elenco, setElenco] = useState(false);
   const [menu, setMenu] = useState(false);
   const [diario, setDiario] = useState(false);

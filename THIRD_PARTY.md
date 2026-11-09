@@ -1,6 +1,6 @@
 # Materiale di terze parti
 
-Il codice di Contrappunto è sotto licenza MIT (vedi [LICENSE](LICENSE)). Questo file elenca il materiale di altri autori incluso nel repository o usato dal programma, con la sua licenza.
+Il codice di Ambo è sotto licenza MIT (vedi [LICENSE](LICENSE)). Questo file elenca il materiale di altri autori incluso nel repository o usato dal programma, con la sua licenza.
 
 ## Modelli 3D
 

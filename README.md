@@ -1,12 +1,12 @@
-# Contrappunto
+# Ambo
 
-**English summary.** Contrappunto is a local web app that lets you chat with Claude Code and Codex at the same time, on your own computer, using the official CLIs and your own subscriptions (no API keys by default). The two agents can also work in turns on a goal and, if you want, write files in an isolated folder and review each other's work. The interface and the documentation are in Italian.
+**English summary.** Ambo is a local web app that lets you chat with Claude Code and Codex at the same time, on your own computer, using the official CLIs and your own subscriptions (no API keys by default). The two agents can also work in turns on a goal and, if you want, write files in an isolated folder and review each other's work. The interface and the documentation are in Italian.
 
-"Contrappunto" è un nome provvisorio: la verifica dei marchi è in corso e il nome potrebbe cambiare.
+*Ambo*, in latino: tutti e due.
 
 ## Cos'è
 
-Contrappunto è un programma che gira sul tuo PC e si usa dal browser. Ti fa chattare con **Claude Code** e **Codex** insieme, con i tuoi abbonamenti.
+Ambo è un programma che gira sul tuo PC e si usa dal browser. Ti fa chattare con **Claude Code** e **Codex** insieme, con i tuoi abbonamenti.
 
 - **Chat.** Scrivi un messaggio e rispondono tutti e due, uno dopo l'altro. Il secondo legge la risposta del primo e aggiunge solo quello che manca, oppure dice che non ha niente da aggiungere.
 - **Scheda compito.** Quando una cosa va fatta, un agente propone una scheda con il tasto **Avvia**.
@@ -36,7 +36,7 @@ I passi sono gli stessi su tutti i sistemi:
 
 1. installa Node.js;
 2. installa Claude Code e Codex CLI;
-3. scarica Contrappunto;
+3. scarica Ambo;
 4. installa le dipendenze e compila la dashboard;
 5. fai il login delle due CLI (vedi [Primo avvio](#primo-avvio-e-login-delle-cli));
 6. avvia il programma.
@@ -87,11 +87,11 @@ Apri **PowerShell** (non serve come amministratore).
    npm install -g @openai/codex
    ```
 
-5. Scarica Contrappunto (lo zip da GitHub, poi estrailo, oppure con git) ed entra nella cartella:
+5. Scarica Ambo (lo zip da GitHub, poi estrailo, oppure con git) ed entra nella cartella:
 
    ```powershell
-   git clone https://github.com/jessiesarci/contrappunto.git
-   cd contrappunto
+   git clone https://github.com/jessiesarci/ambo.git
+   cd ambo
    ```
 
 6. Dipendenze e dashboard:
@@ -143,11 +143,11 @@ Apri il **Terminale**.
    npm install -g @openai/codex
    ```
 
-4. Scarica Contrappunto ed entra nella cartella:
+4. Scarica Ambo ed entra nella cartella:
 
    ```bash
-   git clone https://github.com/jessiesarci/contrappunto.git
-   cd contrappunto
+   git clone https://github.com/jessiesarci/ambo.git
+   cd ambo
    ```
 
 5. Dipendenze e dashboard:
@@ -197,11 +197,11 @@ Apri un terminale. Gli esempi sono per Debian e Ubuntu; sulle altre distribuzion
    npm install -g @openai/codex
    ```
 
-4. Scarica Contrappunto ed entra nella cartella:
+4. Scarica Ambo ed entra nella cartella:
 
    ```bash
-   git clone https://github.com/jessiesarci/contrappunto.git
-   cd contrappunto
+   git clone https://github.com/jessiesarci/ambo.git
+   cd ambo
    ```
 
 5. Dipendenze e dashboard:
@@ -244,7 +244,7 @@ Il comando crea `dati/voce-venv` con faster-whisper. Il modello si scarica la pr
 
 ## Primo avvio e login delle CLI
 
-Il login lo fai tu, con il flusso ufficiale di ciascuna CLI. Contrappunto non chiede, non legge e non salva le tue credenziali: avvia le CLI, che usano il login che hanno già.
+Il login lo fai tu, con il flusso ufficiale di ciascuna CLI. Ambo non chiede, non legge e non salva le tue credenziali: avvia le CLI, che usano il login che hanno già.
 
 **Claude Code.** In un terminale:
 
@@ -265,8 +265,8 @@ Si apre il browser: accedi con il tuo account ChatGPT.
 Cose da sapere:
 
 - Non impostare `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` o simili per questo programma. Il motore le toglie comunque dall'ambiente delle CLI.
-- Di serie il programma rifiuta il login con chiave API (che si paga a consumo). Se una CLI risulta collegata con una chiave API, la partita non parte. Con `CONTRAPPUNTO_CONSENTI_API=1` accetta la chiave API sia per Claude Code sia per Codex.
-- Se Claude passa ai crediti extra a consumo, il programma si ferma sempre, anche con `CONTRAPPUNTO_CONSENTI_API=1`. Se non vuoi spese oltre l'abbonamento, tieni spenti i crediti extra nelle impostazioni del tuo piano Claude.
+- Di serie il programma rifiuta il login con chiave API (che si paga a consumo). Se una CLI risulta collegata con una chiave API, la partita non parte. Con `AMBO_CONSENTI_API=1` accetta la chiave API sia per Claude Code sia per Codex.
+- Se Claude passa ai crediti extra a consumo, il programma si ferma sempre, anche con `AMBO_CONSENTI_API=1`. Se non vuoi spese oltre l'abbonamento, tieni spenti i crediti extra nelle impostazioni del tuo piano Claude.
 - Il programma controlla il login delle CLI da sé. Se ti dice che una CLI non è collegata, rifai il login come sopra.
 
 Poi avvia il programma (`npm start`) e apri http://127.0.0.1:4317.
@@ -283,26 +283,26 @@ La configurazione sta nel file `.env` nella cartella del programma. Copialo da [
 - se un percorso contiene un a capo, il programma si ferma con un messaggio;
 - `~` vale come cartella utente;
 - su Windows vale anche la forma `/c/...` per `C:\...`;
-- i percorsi relativi partono dalla cartella del programma (vale anche per `CONTRAPPUNTO_DATI`).
+- i percorsi relativi partono dalla cartella del programma (vale anche per `AMBO_DATI`).
 
 | Variabile | A cosa serve | Di serie |
 |---|---|---|
-| `CONTRAPPUNTO_NOME` | Come ti chiamano gli agenti | vuoto: "l'utente" |
-| `CONTRAPPUNTO_PROFILO` | Percorso del tuo profilo | `profilo.md` nella cartella del programma |
-| `CONTRAPPUNTO_NOTE` | Una cartella di note markdown da dare in lettura agli agenti (per esempio un vault Obsidian) | nessuna |
-| `CONTRAPPUNTO_SALVA_IN` | Dove il programma salva decisioni e chat come note markdown | `dati/note` |
-| `CONTRAPPUNTO_AMBIENTE` | Con `1` Claude parte con le tue impostazioni utente di Claude Code (il tuo CLAUDE.md, i plugin, le skill) e gli agenti possono leggere le tue skill | spento: Claude parte vuoto |
-| `CONTRAPPUNTO_CONSENTI_API` | Con `1` accetta anche il login con chiave API (fatturazione a consumo), per Claude Code e per Codex. Non permette i crediti extra di Claude: quelli il programma li ferma sempre | spento |
-| `CONTRAPPUNTO_PORTA` | Porta del server | `4317` |
-| `CONTRAPPUNTO_DATI` | Cartella dei dati. Non metterla dentro `AppData` su Windows: lì Claude non può scrivere e la produzione si ferma con un messaggio (vale anche se tutto il programma sta dentro `AppData`) | `./dati` |
+| `AMBO_NOME` | Come ti chiamano gli agenti | vuoto: "l'utente" |
+| `AMBO_PROFILO` | Percorso del tuo profilo | `profilo.md` nella cartella del programma |
+| `AMBO_NOTE` | Una cartella di note markdown da dare in lettura agli agenti (per esempio un vault Obsidian) | nessuna |
+| `AMBO_SALVA_IN` | Dove il programma salva decisioni e chat come note markdown | `dati/note` |
+| `AMBO_AMBIENTE` | Con `1` Claude parte con le tue impostazioni utente di Claude Code (il tuo CLAUDE.md, i plugin, le skill) e gli agenti possono leggere le tue skill | spento: Claude parte vuoto |
+| `AMBO_CONSENTI_API` | Con `1` accetta anche il login con chiave API (fatturazione a consumo), per Claude Code e per Codex. Non permette i crediti extra di Claude: quelli il programma li ferma sempre | spento |
+| `AMBO_PORTA` | Porta del server | `4317` |
+| `AMBO_DATI` | Cartella dei dati. Non metterla dentro `AppData` su Windows: lì Claude non può scrivere e la produzione si ferma con un messaggio (vale anche se tutto il programma sta dentro `AppData`) | `./dati` |
 | `CLAUDE_BIN` | Percorso di Claude Code, se il programma non lo trova da solo: l'eseguibile, oppure (installazione npm) il `cli.js` di Claude Code nella cartella `node_modules` globale | cercato da solo |
 | `CODEX_BIN` | Percorso di Codex, se il programma non lo trova da solo: l'eseguibile, oppure (installazione npm) il `codex.js` di Codex nella cartella `node_modules` globale | cercato da solo |
-| `CONTRAPPUNTO_MODELLO_CODEX` | Modello di serie di Codex, se non vuoi quello della tua configurazione di Codex | quello della configurazione di Codex |
-| `CONTRAPPUNTO_VOCE_PYTHON` | Python da usare per la voce | quello in `dati/voce-venv` |
-| `CONTRAPPUNTO_WHISPER_MODELLO` | Modello di trascrizione | `small` |
-| `CONTRAPPUNTO_LINGUA_VOCE` | Lingua della trascrizione | `it` |
-| `CONTRAPPUNTO_WHISPER_PAROLE` | Parole da suggerire alla trascrizione, separate da virgole (nomi propri, termini tecnici). Si aggiungono all'elenco di base | solo l'elenco di base (Claude, Codex, ...) |
-| `CONTRAPPUNTO_PAROLE_VIETATE` | Solo per `npm run controllo`: parole personali da cercare nei file prima di pubblicare (il tuo nome, i tuoi clienti), separate da virgole. Si può mettere nel `.env` | nessuna |
+| `AMBO_MODELLO_CODEX` | Modello di serie di Codex, se non vuoi quello della tua configurazione di Codex | quello della configurazione di Codex |
+| `AMBO_VOCE_PYTHON` | Python da usare per la voce | quello in `dati/voce-venv` |
+| `AMBO_WHISPER_MODELLO` | Modello di trascrizione | `small` |
+| `AMBO_LINGUA_VOCE` | Lingua della trascrizione | `it` |
+| `AMBO_WHISPER_PAROLE` | Parole da suggerire alla trascrizione, separate da virgole (nomi propri, termini tecnici). Si aggiungono all'elenco di base | solo l'elenco di base (Claude, Codex, ...) |
+| `AMBO_PAROLE_VIETATE` | Solo per `npm run controllo`: parole personali da cercare nei file prima di pubblicare (il tuo nome, i tuoi clienti), separate da virgole. Si può mettere nel `.env` | nessuna |
 
 Il **profilo** è un file markdown in cui scrivi chi sei e come lavori. Parti da [`profilo.esempio.md`](profilo.esempio.md). Gli agenti lo leggono in sola lettura.
 
@@ -322,7 +322,7 @@ Altre cose che puoi fare in chat:
 
 - **Fai rispondere**: dopo uno stop o un errore, fa rispondere gli agenti a quello che è rimasto senza risposta.
 - **Leggi ad alta voce**: il browser legge una risposta, o tutte se lo scegli dal menu. Usa solo le voci installate sul PC.
-- **Salva come nota**: salva la chat come nota markdown nella cartella `Chat` dentro `CONTRAPPUNTO_SALVA_IN`.
+- **Salva come nota**: salva la chat come nota markdown nella cartella `Chat` dentro `AMBO_SALVA_IN`.
 - **Trasforma in compito**: avvia subito una partita dalla chat, anche se nessun agente ha proposto una scheda compito. Scrivi titolo e obiettivo (se c'è già una scheda, li prende da lì). Qui non si sceglie una cartella autorizzata: per quella usa **Avvia** sulla scheda dell'agente.
 
 In chat la ricerca web è spenta.
@@ -342,7 +342,7 @@ In una partita i due agenti lavorano a turni su un obiettivo.
 - Round: da 1 a 10, di serie 3. In ogni round parla una volta ciascuno.
 - **Ricerca web**: facoltativa, si accende per la singola partita quando la crei. Claude e Codex possono cercare sul web; tutti gli altri strumenti restano spenti.
 
-La partita finisce quando i due dichiarano l'accordo pieno uno dopo l'altro, quando sono in stallo, o quando finiscono i round. Poi uno scrive la sintesi e l'altro la verifica. Il risultato è un documento in markdown, che puoi scaricare. A fine partita la decisione si salva anche come nota, nella cartella `Decisioni` dentro `CONTRAPPUNTO_SALVA_IN`.
+La partita finisce quando i due dichiarano l'accordo pieno uno dopo l'altro, quando sono in stallo, o quando finiscono i round. Poi uno scrive la sintesi e l'altro la verifica. Il risultato è un documento in markdown, che puoi scaricare. A fine partita la decisione si salva anche come nota, nella cartella `Decisioni` dentro `AMBO_SALVA_IN`.
 
 Mentre la partita gira puoi:
 
@@ -383,7 +383,7 @@ La voce è facoltativa.
 - **Trascrizione sul PC** (consigliata): usa faster-whisper con il modello `small`, su CPU. L'audio non esce dal PC. Va installata con `npm run voce:installa`.
 - **Dettatura del browser**: in alternativa, dal menu della chat. Passa dai servizi di Google o di Apple, a seconda del browser.
 
-La trascrizione sul PC è in italiano di serie: la lingua si cambia con `CONTRAPPUNTO_LINGUA_VOCE`. Con `CONTRAPPUNTO_WHISPER_PAROLE` suggerisci parole che sbaglia spesso (nomi propri, termini tecnici).
+La trascrizione sul PC è in italiano di serie: la lingua si cambia con `AMBO_LINGUA_VOCE`. Con `AMBO_WHISPER_PAROLE` suggerisci parole che sbaglia spesso (nomi propri, termini tecnici).
 
 Al contrario, la **lettura ad alta voce** delle risposte usa la sintesi vocale del browser, solo con le voci installate sul PC. Se il browser ha solo voci online, il programma non legge e la voce del menu non compare.
 
@@ -399,7 +399,7 @@ Le cartelle si aggiungono sempre e solo dal PC:
 **Note.** Gli agenti possono leggere, sempre in sola lettura:
 
 - il tuo `profilo.md`;
-- una cartella di note markdown, se la indichi in `CONTRAPPUNTO_NOTE`;
+- una cartella di note markdown, se la indichi in `AMBO_NOTE`;
 - le note che il programma salva (decisioni e chat salvate).
 
 Le leggono tramite un piccolo server MCP locale che legge solo file `.md`.
@@ -414,7 +414,7 @@ Una partita si può lanciare anche senza dashboard:
 npm run dibattito -- --round 3 "la tua domanda"
 ```
 
-che equivale a `node --env-file-if-exists=.env motore/cli.ts --round 3 "la tua domanda"`. Senza `--env-file-if-exists=.env` il programma non legge il `.env`: con `CONTRAPPUNTO_DATI` impostata, la partita finirebbe in un'altra cartella e la dashboard non la vedrebbe.
+che equivale a `node --env-file-if-exists=.env motore/cli.ts --round 3 "la tua domanda"`. Senza `--env-file-if-exists=.env` il programma non legge il `.env`: con `AMBO_DATI` impostata, la partita finirebbe in un'altra cartella e la dashboard non la vedrebbe.
 
 ### Comandi npm
 
@@ -427,7 +427,7 @@ che equivale a `node --env-file-if-exists=.env motore/cli.ts --round 3 "la tua d
 | `npm run dibattito` | Partita da terminale |
 | `npm test` | Test |
 | `npm run typecheck` | Controllo dei tipi TypeScript |
-| `npm run controllo` | Cerca in tutti i file di testo del repository dati personali, percorsi, chiavi e segreti, più le parole in `CONTRAPPUNTO_PAROLE_VIETATE` (anche dal `.env`). Controlla anche che l'email di git sia quella anonima di GitHub. Va lanciato prima di pubblicare |
+| `npm run controllo` | Cerca in tutti i file di testo del repository dati personali, percorsi, chiavi e segreti, più le parole in `AMBO_PAROLE_VIETATE` (anche dal `.env`). Controlla anche che l'email di git sia quella anonima di GitHub. Va lanciato prima di pubblicare |
 | `npm run voce:installa` | Installa la trascrizione vocale sul PC |
 
 Per lo sviluppo: `npm run server:dev` in un terminale e `npm run web` in un altro.
@@ -479,6 +479,6 @@ MIT, vedi [LICENSE](LICENSE). Modelli 3D, HDRI, font e dipendenze hanno le loro 
 
 ## Non affiliato
 
-Contrappunto è un progetto indipendente. Non è affiliato ad Anthropic né a OpenAI, e non è approvato da loro. Claude, Claude Code, Codex e ChatGPT sono marchi dei rispettivi titolari: sono citati solo per dire con quali programmi funziona.
+Ambo è un progetto indipendente. Non è affiliato ad Anthropic né a OpenAI, e non è approvato da loro. Claude, Claude Code, Codex e ChatGPT sono marchi dei rispettivi titolari: sono citati solo per dire con quali programmi funziona.
 
 Autore: Jessie Sarcinella

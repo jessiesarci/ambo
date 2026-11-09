@@ -4,7 +4,7 @@
 //   npm run controllo            (controlla i file che git pubblicherebbe)
 //   npm run controllo -- <cartella o archivio estratto>   (controlla un pacchetto già fatto)
 // Esce con codice 1 se trova qualcosa. Le parole personali in più (il tuo nome, i tuoi clienti, i
-// tuoi progetti) si mettono in CONTRAPPUNTO_PAROLE_VIETATE="parola1,parola2", anche nel file .env.
+// tuoi progetti) si mettono in AMBO_PAROLE_VIETATE="parola1,parola2", anche nel file .env.
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -67,7 +67,7 @@ const CONTENUTI: { nome: string; re: RegExp }[] = [
   { nome: 'percorso macOS o Linux di un utente', re: /\/(Users|home)\/(?!(?:<[^>]*>|nome|tuonome|utente|you|runner)(?:\/|$))[a-z0-9._-]{2,}\//i },
   { nome: 'indirizzo email', re: /[A-Za-z0-9._%+-]+@(?!example\.|esempio\.|users\.noreply\.github\.com)[A-Za-z0-9.-]+\.[A-Za-z]{2,}/ },
 ];
-const PAROLE = (process.env.CONTRAPPUNTO_PAROLE_VIETATE ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+const PAROLE = (process.env.AMBO_PAROLE_VIETATE ?? '').split(',').map((p) => p.trim()).filter(Boolean);
 
 // Le eccezioni note, con il motivo: il controllo stesso contiene gli schemi che cerca, e il filtro
 // dei segreti delle cartelle autorizzate ha uno schema che assomiglia a un indirizzo con password.

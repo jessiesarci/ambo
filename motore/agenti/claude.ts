@@ -38,7 +38,7 @@ export const IMPOSTAZIONI_AMBIENTE = {
 
 export function turnoClaude(op: OpzioniClaude): Promise<EsitoCli> {
   const { comando, argsBase } = trovaClaude();
-  // Con l'ambiente acceso (CONTRAPPUNTO_AMBIENTE=1) Claude parte con le impostazioni utente di Claude
+  // Con l'ambiente acceso (AMBO_AMBIENTE=1) Claude parte con le impostazioni utente di Claude
   // Code: CLAUDE.md, plugin e skill (strumento Skill). Senza, nessuna impostazione utente.
   // Le note (op.memoria) sono il server MCP delle note, in sola lettura.
   const ambiente = IMPOSTAZIONI.ambiente;
@@ -101,7 +101,7 @@ export function turnoClaude(op: OpzioniClaude): Promise<EsitoCli> {
         op.suAttivita?.('ragionamento');
       } else if (ev.type === 'rate_limit_event') {
         const info = ev.rate_limit_info ?? {};
-        // I crediti extra si fermano sempre, anche con CONTRAPPUNTO_CONSENTI_API: quella vale per le chiavi API.
+        // I crediti extra si fermano sempre, anche con AMBO_CONSENTI_API: quella vale per le chiavi API.
         if (info.isUsingOverage) return ferma('Claude sta usando crediti extra a consumo: dibattito fermato. Disattiva gli "usage credits" nelle impostazioni del piano');
         if (info.status === 'rejected') {
           limite = { tipo: info.rateLimitType ?? 'abbonamento', reset: info.resetsAt };

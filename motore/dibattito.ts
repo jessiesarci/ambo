@@ -259,7 +259,7 @@ export class Motore extends EventEmitter {
     // Cartella vuota in cui girano le CLI: niente progetto, niente CLAUDE.md o AGENTS.md locali.
     // Fuori dalla cartella del programma: risalendo da qui le CLI non devono trovare i CLAUDE.md o
     // AGENTS.md del repository (sono le regole per chi sviluppa il programma, non per gli agenti).
-    this.stanza = join(tmpdir(), 'contrappunto', createHash('sha256').update(resolve(dati)).digest('hex').slice(0, 12), 'stanza');
+    this.stanza = join(tmpdir(), 'ambo', createHash('sha256').update(resolve(dati)).digest('hex').slice(0, 12), 'stanza');
     mkdirSync(this.stanza, { recursive: true });
     this.dati = dati;
     this.operai = op.operai ?? operaiReali(this.stanza);

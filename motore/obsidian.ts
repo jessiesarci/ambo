@@ -1,7 +1,7 @@
 // Le note salvate dal programma, in markdown compatibile con Obsidian: a fine partita (e a fine
 // produzione) il motore scrive la decisione come nota, e una chat diventa una nota quando lo chiedi.
 // Le partite dopo le ritrovano tra le note. Scrive il motore, non gli agenti, e solo dentro la
-// cartella scelta (CONTRAPPUNTO_SALVA_IN, di serie dati/note).
+// cartella scelta (AMBO_SALVA_IN, di serie dati/note).
 import { mkdirSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { IMPOSTAZIONI } from './impostazioni.ts';
@@ -33,7 +33,7 @@ export function notaDecisione(d: Dibattito): string {
   return [
     '---',
     'type: decisione',
-    'tags: [decisione, contrappunto]',
+    'tags: [decisione, ambo]',
     `created: ${data}`,
     `updated: ${new Date().toISOString().slice(0, 10)}`,
     `esito: ${yaml(d.esito ? ESITO[d.esito] : 'non conclusa')}`,
@@ -44,7 +44,7 @@ export function notaDecisione(d: Dibattito): string {
     '',
     `# ${perNomeFile(d.config.domanda.split('\n')[0]!)}`,
     '',
-    `> Decisione presa in Contrappunto da Claude e Codex il ${new Date(d.creato).toLocaleDateString('it-CH')}: ${d.esito ? ESITO[d.esito] : 'partita non conclusa'}${v ? `, sintesi ${v.approvata ? 'approvata' : 'NON approvata'} da ${NOME[altro(d.sintesi!.relatore)]}` : ''}.`,
+    `> Decisione presa in Ambo da Claude e Codex il ${new Date(d.creato).toLocaleDateString('it-CH')}: ${d.esito ? ESITO[d.esito] : 'partita non conclusa'}${v ? `, sintesi ${v.approvata ? 'approvata' : 'NON approvata'} da ${NOME[altro(d.sintesi!.relatore)]}` : ''}.`,
     '',
     d.config.modo === 'insieme' ? '## Obiettivo' : '## Domanda',
     '',
@@ -103,7 +103,7 @@ export function notaChat(d: Dibattito): string {
   return [
     '---',
     'type: chat',
-    'tags: [chat, contrappunto]',
+    'tags: [chat, ambo]',
     `created: ${data}`,
     `updated: ${new Date().toISOString().slice(0, 10)}`,
     `chat: ${yaml(d.id)}`,
@@ -112,7 +112,7 @@ export function notaChat(d: Dibattito): string {
     '',
     `# ${perNomeFile(d.config.domanda.split('\n')[0]!)}`,
     '',
-    `> Chat in Contrappunto con Claude e Codex, iniziata il ${new Date(d.creato).toLocaleDateString('it-CH')}.`,
+    `> Chat in Ambo con Claude e Codex, iniziata il ${new Date(d.creato).toLocaleDateString('it-CH')}.`,
     '',
     ...messaggi.flatMap((m) => [
       `### ${nomeAutore(m.autore)} · ${quando(m.ora)}${m.voce ? ' · a voce' : ''}`,

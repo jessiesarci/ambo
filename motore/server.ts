@@ -16,7 +16,7 @@ import { Motore } from './dibattito.ts';
 import type { Dibattito, Evento } from './tipi.ts';
 import { AUDIO_MAX, estensioneAudio, Trascrittore } from './voce.ts';
 
-const PORTA = Number(process.env.CONTRAPPUNTO_PORTA || 4317);
+const PORTA = Number(process.env.AMBO_PORTA || 4317);
 const HOST = '127.0.0.1';
 const WEB = resolve(RADICE, 'web', 'dist');
 const LIMITE_CORPO = 64 * 1024;
@@ -306,7 +306,7 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORTA, HOST, () => {
-  console.log(`Contrappunto ${VERSIONE} · http://${HOST}:${PORTA}`);
+  console.log(`Ambo ${VERSIONE} · http://${HOST}:${PORTA}`);
   if (recuperati.length) console.log(`Dibattiti interrotti messi in pausa: ${recuperati.join(', ')}`);
 });
 

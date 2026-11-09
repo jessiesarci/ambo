@@ -23,9 +23,9 @@ export function percorsoUtente(v: string | undefined, nome = 'percorso'): string
   return isAbsolute(x) ? resolve(x) : resolve(RADICE, x);
 }
 
-export const CARTELLA_DATI = percorsoUtente(process.env.CONTRAPPUNTO_DATI, 'CONTRAPPUNTO_DATI') ?? join(RADICE, 'dati');
+export const CARTELLA_DATI = percorsoUtente(process.env.AMBO_DATI, 'AMBO_DATI') ?? join(RADICE, 'dati');
 // Di serie si accettano solo i login con l'abbonamento: una chiave API si paga a consumo.
-export const CONSENTI_API = /^(1|si|true)$/i.test(process.env.CONTRAPPUNTO_CONSENTI_API ?? '');
+export const CONSENTI_API = /^(1|si|true)$/i.test(process.env.AMBO_CONSENTI_API ?? '');
 const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex');
 // La cartella di Claude Code: quella di serie, o quella spostata con CLAUDE_CONFIG_DIR.
 export const CARTELLA_CLAUDE = process.env.CLAUDE_CONFIG_DIR && isAbsolute(process.env.CLAUDE_CONFIG_DIR) ? resolve(process.env.CLAUDE_CONFIG_DIR) : join(homedir(), '.claude');
@@ -116,7 +116,7 @@ export function trovaCodex(): Comando {
 }
 
 export function modelloCodexPredefinito(): string | undefined {
-  if (process.env.CONTRAPPUNTO_MODELLO_CODEX) return process.env.CONTRAPPUNTO_MODELLO_CODEX;
+  if (process.env.AMBO_MODELLO_CODEX) return process.env.AMBO_MODELLO_CODEX;
   try {
     return readFileSync(join(CODEX_HOME, 'config.toml'), 'utf8').match(/^\s*model\s*=\s*"([^"]+)"/m)?.[1];
   } catch {
@@ -139,7 +139,7 @@ export interface Accessi {
 }
 
 // Controllo prima di ogni dibattito: entrambe le CLI devono essere collegate a un abbonamento,
-// non a una chiave API (salvo CONTRAPPUNTO_CONSENTI_API=1). Non legge i file delle credenziali: chiede alle CLI.
+// non a una chiave API (salvo AMBO_CONSENTI_API=1). Non legge i file delle credenziali: chiede alle CLI.
 export async function verificaAccessi(): Promise<Accessi> {
   const env = ambientePulito();
   const claude = trovaClaude();
@@ -150,8 +150,8 @@ export async function verificaAccessi(): Promise<Accessi> {
       const s = JSON.parse(stdout) as { loggedIn?: boolean; authMethod?: string; subscriptionType?: string };
       if (!s.loggedIn) return { ok: false, dettaglio: 'Claude Code non è collegato: lancia `claude` e fai il login con il tuo account Claude' };
       if (s.authMethod !== 'claude.ai') {
-        if (CONSENTI_API) return { ok: true, dettaglio: `Claude Code con "${s.authMethod}" (a consumo, ammesso da CONTRAPPUNTO_CONSENTI_API)` };
-        return { ok: false, dettaglio: `Claude Code usa "${s.authMethod}" invece dell'abbonamento: rifai il login con l'account Claude (o accetta il consumo con CONTRAPPUNTO_CONSENTI_API=1)` };
+        if (CONSENTI_API) return { ok: true, dettaglio: `Claude Code con "${s.authMethod}" (a consumo, ammesso da AMBO_CONSENTI_API)` };
+        return { ok: false, dettaglio: `Claude Code usa "${s.authMethod}" invece dell'abbonamento: rifai il login con l'account Claude (o accetta il consumo con AMBO_CONSENTI_API=1)` };
       }
       return { ok: true, dettaglio: `abbonamento Claude ${s.subscriptionType ?? '?'}` };
     })
@@ -162,8 +162,8 @@ export async function verificaAccessi(): Promise<Accessi> {
       const testo = `${stdout}\n${stderr}`;
       if (/ChatGPT/i.test(testo)) return { ok: true, dettaglio: 'abbonamento ChatGPT' };
       if (/API key/i.test(testo)) return CONSENTI_API
-        ? { ok: true, dettaglio: 'chiave API di OpenAI (a consumo, ammessa da CONTRAPPUNTO_CONSENTI_API)' }
-        : { ok: false, dettaglio: 'Codex usa una chiave API: rifai il login con ChatGPT (`codex login`), o accetta il consumo con CONTRAPPUNTO_CONSENTI_API=1' };
+        ? { ok: true, dettaglio: 'chiave API di OpenAI (a consumo, ammessa da AMBO_CONSENTI_API)' }
+        : { ok: false, dettaglio: 'Codex usa una chiave API: rifai il login con ChatGPT (`codex login`), o accetta il consumo con AMBO_CONSENTI_API=1' };
       return { ok: false, dettaglio: `Codex non risulta collegato: ${testo.trim().split('\n')[0]}` };
     })
     .catch((e: Error) => ({ ok: false, dettaglio: `Codex non risponde: ${e.message.split('\n')[0]}` }));

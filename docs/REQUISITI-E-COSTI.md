@@ -41,7 +41,7 @@ Non sono gratuiti. Ti servono:
 - un abbonamento Claude che includa Claude Code (Pro, Max o superiore);
 - un piano ChatGPT che includa Codex.
 
-Il programma usa la quota di questi abbonamenti. Di serie rifiuta le chiavi API: con una chiave API si paga a consumo, a parte. Con `CONTRAPPUNTO_CONSENTI_API=1` accetta anche una CLI collegata con chiave API, per Claude Code e per Codex, e allora quel consumo lo paghi a parte. Le chiavi passate per variabile d'ambiente (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` e simili) le toglie sempre: la chiave va impostata nella CLI. Se Claude passa ai crediti extra a consumo, il programma si ferma sempre, anche con quell'opzione.
+Il programma usa la quota di questi abbonamenti. Di serie rifiuta le chiavi API: con una chiave API si paga a consumo, a parte. Con `AMBO_CONSENTI_API=1` accetta anche una CLI collegata con chiave API, per Claude Code e per Codex, e allora quel consumo lo paghi a parte. Le chiavi passate per variabile d'ambiente (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` e simili) le toglie sempre: la chiave va impostata nella CLI. Se Claude passa ai crediti extra a consumo, il programma si ferma sempre, anche con quell'opzione.
 
 Come i token pesano sulla quota lo decide ciascun fornitore, e i limiti dei piani cambiano nel tempo. Controlla le pagine ufficiali dei tuoi piani.
 
@@ -51,7 +51,7 @@ I numeri qui sotto sono indicativi. Cambiano con il modello scelto, la lunghezza
 
 **Chat.** Ogni messaggio costa una o due chiamate alle CLI (una per agente che risponde).
 
-- Una risposta di Claude con l'ambiente acceso (`CONTRAPPUNTO_AMBIENTE=1`): circa 45 mila token in ingresso, in buona parte dalla cache.
+- Una risposta di Claude con l'ambiente acceso (`AMBO_AMBIENTE=1`): circa 45 mila token in ingresso, in buona parte dalla cache.
 - Una risposta di Codex: circa 7 mila token in ingresso quando risponde `PASSO`.
 
 **Partita.** Una partita da 3 round con sintesi e verifica è nell'ordine di 300-400 mila token in ingresso in tutto.
@@ -77,7 +77,7 @@ Esempio reale:
 
 - Fai rispondere un solo agente quando basta: `@claude` o `@codex` all'inizio del messaggio, o il selettore in chat.
 - Usa meno round nelle partite.
-- Tieni spento `CONTRAPPUNTO_AMBIENTE` se non ti servono le tue impostazioni di Claude Code: con l'ambiente acceso ogni risposta di Claude porta molto più contesto.
+- Tieni spento `AMBO_AMBIENTE` se non ti servono le tue impostazioni di Claude Code: con l'ambiente acceso ogni risposta di Claude porta molto più contesto.
 - Passa alle partite solo le cartelle che servono.
 - Accendi la ricerca web solo nelle partite che ne hanno bisogno: i risultati delle ricerche entrano nel contesto e aumentano i token.
 - Manda in produzione solo le decisioni che vuoi davvero trasformare in file.

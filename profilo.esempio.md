@@ -2,7 +2,7 @@
 
 <!--
 Modello del file profilo.md. Copialo in profilo.md (nella cartella del programma, o dove indica
-CONTRAPPUNTO_PROFILO) e sostituisci i segnaposto tra parentesi quadre. Togli le sezioni che non ti servono.
+AMBO_PROFILO) e sostituisci i segnaposto tra parentesi quadre. Togli le sezioni che non ti servono.
 Gli agenti lo leggono in sola lettura, e quello che leggono va ai servizi di Anthropic e di OpenAI:
 non scrivere password, chiavi, dati di altre persone o cose che non vuoi mandare a quei servizi.
 -->

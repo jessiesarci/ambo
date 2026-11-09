@@ -316,7 +316,7 @@ test('note salvate: a fine partita la decisione diventa una nota markdown, nella
   assert.match(note[0]!, new RegExp(`^${d.creato.slice(0, 10)} ${d.id.slice(-6)} Tab o spazi`));
   const testo = readFileSync(join(vault, 'Decisioni', note[0]!), 'utf8');
   assert.match(testo, /^---\ntype: decisione\n/);
-  assert.match(testo, /Decisione presa in Contrappunto/);
+  assert.match(testo, /Decisione presa in Ambo/);
   assert.match(testo, /## Decisioni condivise\n\n- d/);
 });
 

@@ -28,7 +28,7 @@ Il progetto è mantenuto da una persona sola: la risposta arriva appena possibil
 Il codice di questo repository, per esempio:
 
 - il server locale: controllo di Host e Origin, CSRF, DNS rebinding, CSP, accesso a file fuori dalla dashboard;
-- il motore: un modo per far usare agli agenti strumenti non ammessi, per far scrivere Claude fuori dal cantiere, per far partire una CLI con una chiave API senza `CONTRAPPUNTO_CONSENTI_API=1`, o per far usare a Claude i crediti extra senza che il motore si fermi;
+- il motore: un modo per far usare agli agenti strumenti non ammessi, per far scrivere Claude fuori dal cantiere, per far partire una CLI con una chiave API senza `AMBO_CONSENTI_API=1`, o per far usare a Claude i crediti extra senza che il motore si fermi;
 - il filtro dei segreti: file di credenziali o segreti che arrivano agli agenti nonostante il filtro;
 - il server MCP delle note: lettura di file che non sono `.md` o che stanno fuori dalle fonti scelte;
 - l'iniezione di istruzioni (prompt injection) da note, cartelle, chat o risultati della ricerca web **quando aggira un controllo del programma**, per esempio facendo scrivere file o usare strumenti che non dovrebbero esserci;
@@ -49,7 +49,7 @@ Il codice di questo repository, per esempio:
 
 **Credenziali.** Il programma non legge i file delle credenziali delle CLI. Chiede alle CLI con che tipo di login sono collegate. Il login si fa con il flusso ufficiale di ciascuna CLI.
 
-**Niente consumo a sorpresa.** Il motore toglie dall'ambiente delle CLI le variabili di Anthropic, Claude Code, OpenAI e Codex e tutte quelle che dal nome sembrano chiavi, token o password, anche di altri servizi (`GITHUB_TOKEN`, `AWS_*`, `HF_TOKEN` e simili). Passano solo `CLAUDE_CODE_GIT_BASH_PATH` e `CLAUDE_CONFIG_DIR`, che sono configurazione. Le chiavi passate per variabile d'ambiente si tolgono sempre, anche con `CONTRAPPUNTO_CONSENTI_API=1`. Di serie controlla che Claude non usi una chiave API (`apiKeySource`) e che Codex sia collegato con ChatGPT: se no, si ferma. Il login con chiave API, per Claude Code e per Codex, si accetta solo con `CONTRAPPUNTO_CONSENTI_API=1`. I crediti extra di Claude (`isUsingOverage`) il motore li ferma sempre, anche con quell'opzione.
+**Niente consumo a sorpresa.** Il motore toglie dall'ambiente delle CLI le variabili di Anthropic, Claude Code, OpenAI e Codex e tutte quelle che dal nome sembrano chiavi, token o password, anche di altri servizi (`GITHUB_TOKEN`, `AWS_*`, `HF_TOKEN` e simili). Passano solo `CLAUDE_CODE_GIT_BASH_PATH` e `CLAUDE_CONFIG_DIR`, che sono configurazione. Le chiavi passate per variabile d'ambiente si tolgono sempre, anche con `AMBO_CONSENTI_API=1`. Di serie controlla che Claude non usi una chiave API (`apiKeySource`) e che Codex sia collegato con ChatGPT: se no, si ferma. Il login con chiave API, per Claude Code e per Codex, si accetta solo con `AMBO_CONSENTI_API=1`. I crediti extra di Claude (`isUsingOverage`) il motore li ferma sempre, anche con quell'opzione.
 
 **Agenti senza mani in chat e in partita.** Claude parte con un elenco ristretto di strumenti (`--tools`) e i permessi in modalità `dontAsk`, che nega tutto quello che non è elencato. Codex parte con la sandbox in sola lettura e gli strumenti spenti. Se una CLI usa uno strumento o un server MCP non ammesso, il motore ferma il turno.
 

@@ -4,7 +4,7 @@ Istruzioni per gli assistenti AI (Claude Code, Codex e altri) che lavorano in qu
 
 ## Cos'è
 
-Contrappunto (nome provvisorio) è un programma locale: chat con Claude Code e Codex insieme, partite a turni su un obiettivo, produzione di file in una cartella recintata (il cantiere) con collaudo. Usa le CLI ufficiali con il login e l'abbonamento di chi lo usa. Il server ascolta solo su 127.0.0.1. Non c'è una parte online, non ci sono account del programma, non c'è telemetria.
+Ambo è un programma locale: chat con Claude Code e Codex insieme, partite a turni su un obiettivo, produzione di file in una cartella recintata (il cantiere) con collaudo. Usa le CLI ufficiali con il login e l'abbonamento di chi lo usa. Il server ascolta solo su 127.0.0.1. Non c'è una parte online, non ci sono account del programma, non c'è telemetria.
 
 Il funzionamento è descritto in [docs/COME-FUNZIONA.md](docs/COME-FUNZIONA.md). Il modello di sicurezza in [SECURITY.md](SECURITY.md).
 
@@ -29,7 +29,7 @@ Non chiedere mai all'utente di incollare token, chiavi, codici di accesso o file
 
 - Non aggiungere chiavi API in nessun posto: codice, `.env`, script, configurazioni, test, documentazione, CI.
 - Non aggiungere né suggerire variabili `ANTHROPIC_*` o `OPENAI_*` (e simili, come `CODEX_API_KEY`).
-- Non accendere `CONTRAPPUNTO_CONSENTI_API` di tua iniziativa. Se l'utente vuole usarla, ricordagli che con una chiave API si paga a consumo.
+- Non accendere `AMBO_CONSENTI_API` di tua iniziativa. Se l'utente vuole usarla, ricordagli che con una chiave API si paga a consumo.
 
 ### 3. Il login lo fa l'utente
 
@@ -92,7 +92,7 @@ npm run controllo
 
 Se uno dei tre fallisce, il lavoro non è finito. Non spegnere i test o il controllo per farli passare.
 
-`npm run controllo` legge anche il `.env` (per `CONTRAPPUNTO_PAROLE_VIETATE`), guarda tutti i file di testo del repository e controlla l'email di git.
+`npm run controllo` legge anche il `.env` (per `AMBO_PAROLE_VIETATE`), guarda tutti i file di testo del repository e controlla l'email di git.
 
 ### Prima del primo commit
 
@@ -144,7 +144,7 @@ docs/              documentazione
 dati/              creata all'avvio, fuori dal repository: chat, partite, cantieri, note salvate
 ```
 
-I nomi dei singoli file possono cambiare: in caso di dubbio cerca nel codice. Le variabili `CONTRAPPUNTO_*` non si leggono tutte in `impostazioni.ts`: `CONTRAPPUNTO_DATI` e `CONTRAPPUNTO_CONSENTI_API` stanno in `ambiente.ts` (e i controlli sulle chiavi API usano quella copia), `CONTRAPPUNTO_PORTA` in `server.ts`, quelle della voce in `voce.ts`, `CONTRAPPUNTO_PAROLE_VIETATE` in `strumenti/controllo-sterile.ts`.
+I nomi dei singoli file possono cambiare: in caso di dubbio cerca nel codice. Le variabili `AMBO_*` non si leggono tutte in `impostazioni.ts`: `AMBO_DATI` e `AMBO_CONSENTI_API` stanno in `ambiente.ts` (e i controlli sulle chiavi API usano quella copia), `AMBO_PORTA` in `server.ts`, quelle della voce in `voce.ts`, `AMBO_PAROLE_VIETATE` in `strumenti/controllo-sterile.ts`.
 
 ## Comandi
 
@@ -172,7 +172,7 @@ I nomi dei singoli file possono cambiare: in caso di dubbio cerca nel codice. Le
 - Poche dipendenze. Aggiungine una solo se serve davvero, con una licenza compatibile con MIT, e aggiorna [THIRD_PARTY.md](THIRD_PARTY.md).
 - I commenti spiegano il perché, non il cosa.
 - Nei test niente CLI vere: il `Motore` accetta `chiamaAgente`, `verificaAccessi`, `operai` e una `cartellaDati` temporanea.
-- Chi usa il programma nel codice e nei messaggi si chiama "l'utente" (o il nome in `CONTRAPPUNTO_NOME`). Mai nomi veri.
+- Chi usa il programma nel codice e nei messaggi si chiama "l'utente" (o il nome in `AMBO_NOME`). Mai nomi veri.
 - Testi dell'interfaccia brevi e concreti. Niente emoji.
 
 ## Se aiuti qualcuno a installarlo

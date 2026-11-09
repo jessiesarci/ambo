@@ -8,11 +8,11 @@ import re
 import sys
 import time
 
-MODELLO = os.environ.get("CONTRAPPUNTO_WHISPER_MODELLO", "small")
+MODELLO = os.environ.get("AMBO_WHISPER_MODELLO", "small")
 # Parole che Whisper sbaglia facilmente: le suggeriamo come contesto iniziale. Se ne aggiungono altre
-# con CONTRAPPUNTO_WHISPER_PAROLE (nomi propri, progetti, termini tecnici di chi lo usa).
+# con AMBO_WHISPER_PAROLE (nomi propri, progetti, termini tecnici di chi lo usa).
 VOCABOLARIO = " ".join(
-    p for p in ("Claude, Codex, ChatGPT, Obsidian, prompt, deploy, dashboard, markdown.", os.environ.get("CONTRAPPUNTO_WHISPER_PAROLE", "").strip()) if p
+    p for p in ("Claude, Codex, ChatGPT, Obsidian, prompt, deploy, dashboard, markdown.", os.environ.get("AMBO_WHISPER_PAROLE", "").strip()) if p
 )
 
 
@@ -68,7 +68,7 @@ def main():
         try:
             segmenti, info = modello.transcribe(
                 richiesta["file"],
-                language=richiesta.get("lingua") or os.environ.get("CONTRAPPUNTO_LINGUA_VOCE") or "it",
+                language=richiesta.get("lingua") or os.environ.get("AMBO_LINGUA_VOCE") or "it",
                 beam_size=3,
                 vad_filter=True,
                 initial_prompt=VOCABOLARIO,

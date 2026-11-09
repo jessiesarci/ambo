@@ -45,7 +45,7 @@ Comandi della chat:
 - **Ferma**: interrompe le risposte in corso.
 - **Fai rispondere**: dopo uno stop o un errore, fa rispondere gli agenti a quello che è rimasto senza risposta. Se un agente era stato fermato perché passava ai crediti a consumo, finché il programma resta acceso serve questo gesto esplicito per richiamarlo. Il blocco non si salva: dopo un riavvio il primo messaggio nuovo fa rispondere anche quell'agente.
 - **Leggi ad alta voce**: legge una risposta con la sintesi vocale del browser, solo con le voci installate sul PC. Dal menu si può far leggere ogni risposta nuova.
-- **Salva come nota**: salva la chat come nota markdown nella sottocartella `Chat` di `CONTRAPPUNTO_SALVA_IN`.
+- **Salva come nota**: salva la chat come nota markdown nella sottocartella `Chat` di `AMBO_SALVA_IN`.
 - **Trasforma in compito**: apre una finestra da riempire a mano (titolo, obiettivo, "solo il piano" o "piano, poi produzione") e avvia la partita. Se un agente ha già proposto una scheda, parte da quella, ma la cartella della scheda non passa: per una partita con il materiale di una cartella usa **Avvia** sulla scheda.
 
 ## Scheda compito
@@ -117,7 +117,7 @@ Finita la partita:
 
 Il documento finale è in markdown: domanda, interventi, sintesi, verifica, token usati. Si scarica dalla pagina della partita.
 
-A fine partita il motore salva anche la decisione come nota markdown nella sottocartella `Decisioni` di `CONTRAPPUNTO_SALVA_IN`, e la aggiorna quando finisce la produzione. Le partite dopo la ritrovano tra le note.
+A fine partita il motore salva anche la decisione come nota markdown nella sottocartella `Decisioni` di `AMBO_SALVA_IN`, e la aggiorna quando finisce la produzione. Le partite dopo la ritrovano tra le note.
 
 ### Materiale
 
@@ -169,10 +169,10 @@ Gli agenti possono leggere alcune note tramite un piccolo **server MCP locale** 
 
 Le fonti, decise dal motore:
 
-- il **profilo** (`profilo.md`, o il file in `CONTRAPPUNTO_PROFILO`);
-- la **cartella di note** in `CONTRAPPUNTO_NOTE`, se c'è;
-- la cartella delle **note salvate**, `CONTRAPPUNTO_SALVA_IN`: lì il programma mette le decisioni delle partite (sottocartella `Decisioni`) e le chat salvate con "Salva come nota" (sottocartella `Chat`). Gli agenti leggono tutti i file `.md` della cartella, non solo quelle due: se la fai puntare alla radice del tuo vault, leggono tutto il vault. Meglio una cartella dedicata;
-- con `CONTRAPPUNTO_AMBIENTE=1`, anche le tue cartelle di Claude Code: il tuo `CLAUDE.md`, le skill, gli agenti, i comandi e la cartella dei plugin scaricati (`.claude/plugins/cache`, con tutti i loro file `.md`, anche dei plugin spenti); in più le skill di Codex.
+- il **profilo** (`profilo.md`, o il file in `AMBO_PROFILO`);
+- la **cartella di note** in `AMBO_NOTE`, se c'è;
+- la cartella delle **note salvate**, `AMBO_SALVA_IN`: lì il programma mette le decisioni delle partite (sottocartella `Decisioni`) e le chat salvate con "Salva come nota" (sottocartella `Chat`). Gli agenti leggono tutti i file `.md` della cartella, non solo quelle due: se la fai puntare alla radice del tuo vault, leggono tutto il vault. Meglio una cartella dedicata;
+- con `AMBO_AMBIENTE=1`, anche le tue cartelle di Claude Code: il tuo `CLAUDE.md`, le skill, gli agenti, i comandi e la cartella dei plugin scaricati (`.claude/plugins/cache`, con tutti i loro file `.md`, anche dei plugin spenti); in più le skill di Codex.
 
 Il server:
 
@@ -183,32 +183,32 @@ Il server:
 
 Gli agenti trattano le note come dati, non come istruzioni.
 
-Con `CONTRAPPUNTO_AMBIENTE` spento (di serie) Claude parte senza le tue impostazioni utente di Claude Code: niente CLAUDE.md, plugin, skill, hook o server MCP tuoi. Acceso, Claude parte con le tue impostazioni utente, ma con gli hook spenti e con il divieto esplicito degli strumenti che scrivono o eseguono.
+Con `AMBO_AMBIENTE` spento (di serie) Claude parte senza le tue impostazioni utente di Claude Code: niente CLAUDE.md, plugin, skill, hook o server MCP tuoi. Acceso, Claude parte con le tue impostazioni utente, ma con gli hook spenti e con il divieto esplicito degli strumenti che scrivono o eseguono.
 
 ## Voce
 
 - **Trascrizione sul PC**: il motore avvia un processo Python con faster-whisper (modello `small`, su CPU) alla prima richiesta, lo tiene in memoria per un po' e poi lo spegne. L'audio sta su disco solo il tempo della trascrizione. L'audio non esce dal PC.
 - **Dettatura del browser**: la fa il browser, con i servizi di Google o di Apple. Si sceglie dal menu della chat.
 
-La trascrizione sul PC usa la lingua di `CONTRAPPUNTO_LINGUA_VOCE` (di serie `it`). Con `CONTRAPPUNTO_WHISPER_PAROLE` si suggeriscono al modello altre parole che sbaglia facilmente, separate da virgole: si aggiungono a un elenco di base (Claude, Codex, ChatGPT, ...). Il programma toglie anche le frasi che Whisper a volte "sente" nel silenzio, come le righe di chiusura dei sottotitoli.
+La trascrizione sul PC usa la lingua di `AMBO_LINGUA_VOCE` (di serie `it`). Con `AMBO_WHISPER_PAROLE` si suggeriscono al modello altre parole che sbaglia facilmente, separate da virgole: si aggiungono a un elenco di base (Claude, Codex, ChatGPT, ...). Il programma toglie anche le frasi che Whisper a volte "sente" nel silenzio, come le righe di chiusura dei sottotitoli.
 
 La **lettura ad alta voce** delle risposte è la sintesi vocale del browser. Il programma usa solo le voci installate sul PC: se il browser ha solo voci online, non legge e la voce del menu non compare. Toglie il markdown prima di leggere.
 
 ## Dati salvati
 
-Tutto sta in `dati/` nella cartella del programma (o in `CONTRAPPUNTO_DATI`):
+Tutto sta in `dati/` nella cartella del programma (o in `AMBO_DATI`):
 
 - chat e partite, un file JSON ciascuna;
 - i documenti finali delle partite in markdown;
 - i cantieri della produzione (`dati/cantieri/<id>`);
-- le note salvate (`dati/note`, se non scegli un'altra cartella con `CONTRAPPUNTO_SALVA_IN`), con le sottocartelle `Decisioni` e `Chat`;
+- le note salvate (`dati/note`, se non scegli un'altra cartella con `AMBO_SALVA_IN`), con le sottocartelle `Decisioni` e `Chat`;
 - l'elenco delle cartelle autorizzate;
 - l'ambiente Python della voce (`dati/voce-venv`), se lo installi.
 
-Su Windows la cartella dei dati non deve stare dentro `AppData` (e il programma neanche): il motore vieta a Claude quella cartella, come quelle delle CLI e delle chiavi SSH, quindi ferma la produzione con un messaggio. Un percorso relativo in `CONTRAPPUNTO_DATI` parte dalla cartella del programma.
+Su Windows la cartella dei dati non deve stare dentro `AppData` (e il programma neanche): il motore vieta a Claude quella cartella, come quelle delle CLI e delle chiavi SSH, quindi ferma la produzione con un messaggio. Un percorso relativo in `AMBO_DATI` parte dalla cartella del programma.
 
 Niente esce dal PC, salvo quello che le CLI mandano ai rispettivi servizi per rispondere. Questo include i messaggi, il contesto della chat e quello che gli agenti leggono: profilo, note, copie delle cartelle autorizzate, file del cantiere. Con la ricerca web accesa, anche le ricerche che fanno gli agenti. Con la dettatura del browser, l'audio passa dai servizi del browser.
 
 Le CLI tengono anche la loro cronologia delle sessioni nelle proprie cartelle, come fanno sempre.
 
-Per cancellare tutto quello che il programma ha salvato, chiudilo e cancella la cartella `dati/` (o quella di `CONTRAPPUNTO_DATI`). Se hai messo le note in un'altra cartella con `CONTRAPPUNTO_SALVA_IN`, lì restano le sottocartelle `Decisioni` e `Chat`. Nella cartella temporanea del sistema c'è anche una cartella di lavoro vuota per le CLI (`contrappunto`), che puoi cancellare.
+Per cancellare tutto quello che il programma ha salvato, chiudilo e cancella la cartella `dati/` (o quella di `AMBO_DATI`). Se hai messo le note in un'altra cartella con `AMBO_SALVA_IN`, lì restano le sottocartelle `Decisioni` e `Chat`. Nella cartella temporanea del sistema c'è anche una cartella di lavoro vuota per le CLI (`ambo`), che puoi cancellare.

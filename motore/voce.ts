@@ -54,10 +54,10 @@ export class Trascrittore {
   private coda: Promise<unknown> = Promise.resolve();
   private readonly python: string;
   private readonly cartella: string;
-  readonly modello = process.env.CONTRAPPUNTO_WHISPER_MODELLO || 'small';
+  readonly modello = process.env.AMBO_WHISPER_MODELLO || 'small';
 
   constructor(dati: string) {
-    this.python = percorsoUtente(process.env.CONTRAPPUNTO_VOCE_PYTHON, 'CONTRAPPUNTO_VOCE_PYTHON') ?? join(dati, 'voce-venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+    this.python = percorsoUtente(process.env.AMBO_VOCE_PYTHON, 'AMBO_VOCE_PYTHON') ?? join(dati, 'voce-venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
     this.cartella = join(dati, 'voce');
     // Vocali rimasti da una chiusura a metà trascrizione: non servono più a nessuno.
     rmSync(this.cartella, { recursive: true, force: true });

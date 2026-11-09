@@ -125,7 +125,7 @@ function SkillAgente({ usate, disponibili }: { usate: string[]; disponibili?: Sk
       {aperto && (
         <>
           {!disponibili && <p className="mt-0.5 text-grafite">Il motore non ha ancora mandato l'elenco.</p>}
-          {disponibili?.length === 0 && <p className="mt-0.5 text-grafite">Nessuna: gli agenti partono senza le tue impostazioni. Per dargli le tue skill di Claude Code metti CONTRAPPUNTO_AMBIENTE=1 nel file .env e riavvia.</p>}
+          {disponibili?.length === 0 && <p className="mt-0.5 text-grafite">Nessuna: gli agenti partono senza le tue impostazioni. Per dargli le tue skill di Claude Code metti AMBO_AMBIENTE=1 nel file .env e riavvia.</p>}
           {disponibili && disponibili.length > 6 && (
             <input className="campo mt-1 !py-1.5 text-[16px] md:text-[13px]" placeholder="Cerca una skill" value={filtro} onChange={(e) => setFiltro(e.target.value)} aria-label="Cerca una skill" />
           )}

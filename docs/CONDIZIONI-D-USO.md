@@ -4,7 +4,7 @@ Questa pagina non è un parere legale. Riassume come funziona il programma e cos
 
 ## Perché il programma usa le CLI ufficiali con il tuo login
 
-Contrappunto non parla con i modelli in modo diretto. Avvia sul tuo PC le CLI ufficiali, Claude Code e Codex CLI, così come le pubblicano Anthropic e OpenAI, e queste usano il login che hai fatto tu.
+Ambo non parla con i modelli in modo diretto. Avvia sul tuo PC le CLI ufficiali, Claude Code e Codex CLI, così come le pubblicano Anthropic e OpenAI, e queste usano il login che hai fatto tu.
 
 In pratica:
 
