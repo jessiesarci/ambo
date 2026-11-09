@@ -1,0 +1,10 @@
+{
+  "id": "documento",
+  "nome": "Documento",
+  "quando": "guide, proposte, documentazione, testi lunghi da consegnare",
+  "passi": [
+    { "assistente": "ricerca", "fase": "piano" },
+    { "assistente": "testi", "fase": "produzione" },
+    { "assistente": "controllo", "fase": "collaudo" }
+  ]
+}

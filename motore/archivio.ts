@@ -14,7 +14,7 @@ export function nuovoId(ora = new Date()): string {
 }
 
 // Su Windows antivirus e indicizzatore tengono aperti i file per qualche istante.
-function riprova<T>(fn: () => T): T {
+export function riprova<T>(fn: () => T): T {
   for (let i = 0; ; i++) {
     try {
       return fn();

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NOME, type Agente } from '../../motore/tipi.ts';
 import { api, type Accessi, type Info, type Riassunto } from './api.ts';
-import { Avvisi, Cartello, SchedaAgente, usaReazioni } from './hud/Avvisi.tsx';
+import { Avvisi, Cartello, Scheda, usaReazioni, type SchedaAperta } from './hud/Avvisi.tsx';
 import { Barra } from './hud/Barra.tsx';
 import { ComandiDalVivo, ComandiReplay } from './hud/Comandi.tsx';
 import { Dialogo } from './hud/Dialogo.tsx';
@@ -19,6 +19,7 @@ import { INQUADRATURE, type Inquadratura } from './scena/Telecamera.tsx';
 import { Cartelle } from './schermate/Cartelle.tsx';
 import { Chat } from './schermate/Chat.tsx';
 import { Lobby } from './schermate/Lobby.tsx';
+import { ContestoSquadra } from './squadra.ts';
 import { ETICHETTE_ESITO, ETICHETTE_STATO } from './stato.ts';
 import { usaPartita, type Modo } from './usaPartita.ts';
 
@@ -88,7 +89,10 @@ export function App() {
   const [registro, setRegistro] = useState(false);
   const [scelto, setScelto] = useState<number | null>(null);
   const [documento, setDocumento] = useState(false);
-  const [scheda, setScheda] = useState<Agente | null>(null);
+  // La scheda aperta: Claude o Codex (dalla scena o dalla chat) oppure un assistente della squadra.
+  const [scheda, setScheda] = useState<SchedaAperta | null>(null);
+  const apriAgente = useCallback((agente: Agente) => setScheda({ tipo: 'agente', agente }), []);
+  const apriAssistente = useCallback((id: string) => setScheda({ tipo: 'assistente', id }), []);
   const [errore, setErrore] = useState<string>();
   const [serverGiu, setServerGiu] = useState(false);
   const [pannelloCartelle, setPannelloCartelle] = useState(false);
@@ -157,15 +161,22 @@ export function App() {
     ? ultimoMsg && ultimoMsg.autore !== 'utente' && ultimoMsg.autore !== 'motore' && !ultimoMsg.passa ? `${NOME[ultimoMsg.autore]} ha risposto.` : ultimoMsg?.autore === 'motore' ? ultimoMsg.testo : ''
     : d?.esito
       ? `Partita finita: ${ETICHETTE_ESITO[d.esito]}.`
-      : ultimoTurno ? `${NOME[ultimoTurno.agente]} ha chiuso il turno ${ultimoTurno.indice}: ${ETICHETTE_STATO[ultimoTurno.risposta.stato]}.` : '';
+      : ultimoTurno ? `${NOME[ultimoTurno.agente]} ha chiuso l'intervento ${ultimoTurno.indice}: ${ETICHETTE_STATO[ultimoTurno.risposta.stato]}.` : '';
 
   const inPartita = rotta.schermo === 'partita' || rotta.schermo === 'replay';
+  // Il catalogo della squadra con XP e livelli arriva da /api/info; in partita un tocco su un
+  // assistente (in scena o nei pannelli) apre la sua scheda.
+  const squadra = useMemo(
+    () => ({ squadra: info?.squadra ?? [], procedure: info?.procedure ?? [], ...(inPartita ? { apri: apriAssistente } : {}) }),
+    [info?.squadra, info?.procedure, inPartita, apriAssistente],
+  );
   const avvisoServer = serverGiu ? 'Il server del motore non risponde: avvialo con npm start (o npm run server:dev in sviluppo).' : undefined;
 
   // Sul telefono con la chat a tutto schermo la scena non si vede: si ferma.
   const scenaCoperta = entrato && inChat && stretto && !ufficio;
 
   return (
+    <ContestoSquadra.Provider value={squadra}>
     <div className="fixed inset-0">
       <Scena
         vista={vista}
@@ -175,7 +186,7 @@ export function App() {
         inquadratura={inquadratura}
         onScatola={(id) => vai(`#/partita/${id}`)}
         onStampante={() => d?.stato === 'concluso' && d.config.tipo !== 'chat' && setDocumento(true)}
-        onAgente={inPartita || inChat ? setScheda : undefined}
+        onAgente={inPartita || inChat ? apriAgente : undefined}
         pausa={scenaCoperta}
         margineSinistro={entrato && inChat && !stretto ? 452 : 0}
       />
@@ -203,7 +214,7 @@ export function App() {
             onUfficio={() => setUfficio(true)}
             onChat={() => setUfficio(false)}
             onPartita={(id) => vai(`#/partita/${id}`)}
-            onScheda={setScheda}
+            onScheda={apriAgente}
             onCartelle={() => setPannelloCartelle(true)}
           />
         </div>
@@ -234,7 +245,7 @@ export function App() {
               <Barra vista={vista} onIndietro={() => vai(d?.contestoChat ? `#/chat/${d.contestoChat.id}` : '#/partite')} segui={segui} setSegui={setSegui} etichetta={rotta.schermo === 'replay' ? 'Replay' : undefined} />
               <div className="flex min-h-0 flex-1 gap-2">
                 <div className="hidden min-w-0 flex-1 flex-col items-start gap-2 md:flex">
-                  {scheda && <SchedaAgente agente={scheda} vista={vista} onChiudi={() => setScheda(null)} skill={info?.skill?.[scheda]} />}
+                  {scheda && <Scheda scheda={scheda} vista={vista} info={info} onChiudi={() => setScheda(null)} />}
                 </div>
                 <div className="ml-auto flex w-full flex-col items-end gap-2 md:max-w-sm">
                   <div className="pannello pointer-events-auto flex gap-1 p-1" role="group" aria-label="Inquadratura">
@@ -257,12 +268,12 @@ export function App() {
                     <div className="pannello pointer-events-auto w-full !border-[#141518] p-3 text-[13px]" role="alert">
                       <div className="etichetta !text-[#9b2626]">Partita ferma per un errore</div>
                       <p className="mt-1 break-words">{d.errore.messaggio}</p>
-                      <p className="mt-1 text-grafite">{d.errore.recuperabile ? 'Si può riprendere dallo stesso turno.' : 'Non si può riprendere: si può solo chiudere la partita.'}</p>
+                      <p className="mt-1 text-grafite">{d.errore.recuperabile ? 'Si può riprendere dallo stesso intervento.' : 'Non si può riprendere: si può solo chiudere la partita.'}</p>
                     </div>
                   )}
                   {registro && (
                     <div className="hidden min-h-0 w-full flex-1 md:flex">
-                      <Registro vista={vista} scelto={scelto} setScelto={setScelto} onChiudi={() => setRegistro(false)} />
+                      <Registro vista={vista} scelto={scelto} setScelto={setScelto} onAssistente={apriAssistente} onChiudi={() => setRegistro(false)} />
                     </div>
                   )}
                 </div>
@@ -287,23 +298,25 @@ export function App() {
       {/* Sul telefono scheda e registro sono fogli sopra la scena, a tutta larghezza. */}
       {scheda && inPartita && (
         <div className="pointer-events-auto fixed inset-x-2 top-16 z-30 md:hidden">
-          <SchedaAgente agente={scheda} vista={vista} onChiudi={() => setScheda(null)} skill={info?.skill?.[scheda]} />
+          <Scheda scheda={scheda} vista={vista} info={info} onChiudi={() => setScheda(null)} />
         </div>
       )}
       {/* In chat la scheda dell'omino: sopra la scena a destra sul computer, in alto sul telefono. */}
       {scheda && inChat && entrato && (
         <div className="pointer-events-auto fixed inset-x-2 top-[max(3.5rem,env(safe-area-inset-top))] z-30 flex justify-center md:inset-x-auto md:right-3 md:top-3 md:w-96">
-          <SchedaAgente agente={scheda} vista={vista} onChiudi={() => setScheda(null)} skill={info?.skill?.[scheda]} />
+          <Scheda scheda={scheda} vista={vista} info={info} onChiudi={() => setScheda(null)} />
         </div>
       )}
+      {/* Il registro sul telefono copre la scena: aprendo una scheda o un intervento si chiude. */}
       {registro && inPartita && (
         <div className="pointer-events-auto fixed inset-x-2 bottom-2 top-16 z-30 flex md:hidden">
-          <Registro vista={vista} scelto={scelto} setScelto={(i) => { setScelto(i); setRegistro(false); }} onChiudi={() => setRegistro(false)} />
+          <Registro vista={vista} scelto={scelto} setScelto={(i) => { setScelto(i); setRegistro(false); }} onAssistente={(id) => { apriAssistente(id); setRegistro(false); }} onChiudi={() => setRegistro(false)} />
         </div>
       )}
       {documento && d && !inChat && <Risultato dibattito={d} onChiudi={() => setDocumento(false)} onRivedi={rotta.schermo !== 'replay' && d.stato === 'concluso' ? () => vai(`#/replay/${d.id}`) : undefined} cartelle={rotta.schermo === 'replay' ? [] : info?.cartelle ?? []} soloLettura={rotta.schermo === 'replay'} />}
       {!inChat && <Cartello esito={cartello} />}
       {pannelloCartelle && <Cartelle onChiudi={() => { setPannelloCartelle(false); aggiorna(); }} />}
     </div>
+    </ContestoSquadra.Provider>
   );
 }

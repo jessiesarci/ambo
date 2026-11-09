@@ -2,9 +2,12 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { NOME, type Agente, type Esito } from '../../../motore/tipi.ts';
+import type { Info } from '../api.ts';
+import { alLavoro, chiE, usaSquadra } from '../squadra.ts';
 import { suona } from '../suoni.ts';
 import { ETICHETTE_ESITO, type Azione, type Vista } from '../stato.ts';
 import { NomeAgente, PastigliaStato } from './comuni.tsx';
+import { SchedaAssistente } from './Squadra.tsx';
 
 export interface AvvisoExtra {
   testo: string;
@@ -99,9 +102,10 @@ export function usaReazioni(vista: Vista, onFine: () => void, dalVivo: boolean):
 
 type SkillPc = { nome: string; descrizione: string; fonte: string };
 
-// Cosa sta facendo adesso, a parole, dallo stato dal vivo.
-function adesso(v: Vista, a: Agente): string {
-  if (v.parlante !== a) return v.fase[a] === 'errore' ? 'Fermo per un errore' : 'Libero';
+// Cosa sta facendo adesso, a parole, dallo stato dal vivo. atteso: l'assistente che lavora a un
+// incarico chiesto da lui.
+function adesso(v: Vista, a: Agente, atteso?: string): string {
+  if (v.parlante !== a) return v.fase[a] === 'errore' ? 'Fermo per un errore' : atteso ? `Aspetta il rapporto di ${atteso}` : 'Libero';
   const azione = v.azione[a];
   if (v.fase[a] === 'strumento' && azione) return azione.testo;
   return v.fase[a] === 'risposta' ? 'Scrive' : 'Ci sta pensando';
@@ -143,8 +147,19 @@ function SkillAgente({ usate, disponibili }: { usate: string[]; disponibili?: Sk
   );
 }
 
+// La scheda di chi è stato toccato in scena o nei pannelli: un capo reparto o un assistente.
+export type SchedaAperta = { tipo: 'agente'; agente: Agente } | { tipo: 'assistente'; id: string };
+
+export function Scheda({ scheda, vista, info, onChiudi }: { scheda: SchedaAperta; vista: Vista; info?: Info; onChiudi: () => void }) {
+  return scheda.tipo === 'agente'
+    ? <SchedaAgente agente={scheda.agente} vista={vista} onChiudi={onChiudi} skill={info?.skill?.[scheda.agente]} />
+    : <SchedaAssistente id={scheda.id} vista={vista} onChiudi={onChiudi} />;
+}
+
 export function SchedaAgente({ agente, vista, onChiudi, skill }: { agente: Agente; vista: Vista; onChiudi: () => void; skill?: SkillPc[] }) {
+  const { squadra } = usaSquadra();
   const d = vista.dibattito;
+  const atteso = alLavoro(vista).find((l) => l.tipo === 'incarico' && l.da === agente);
   const ultimo = d ? [...d.turni].reverse().find((t) => t.agente === agente) : undefined;
   const modello = agente === 'claude' ? d?.config.claude.modello : d?.config.codex.modello;
   // In chat: le azioni della CLI salvate sui messaggi, più quelle dal vivo del diario.
@@ -163,7 +178,7 @@ export function SchedaAgente({ agente, vista, onChiudi, skill }: { agente: Agent
           <X size={16} />
         </button>
       </div>
-      <p className="mt-1 text-[13px]"><span className="etichetta">Adesso</span> {adesso(vista, agente)}</p>
+      <p className="mt-1 text-[13px]"><span className="etichetta">Adesso</span> {adesso(vista, agente, atteso ? chiE(squadra, atteso.id).nome : undefined)}</p>
       {chat ? (
         <div className="mt-2 text-[13px]">
           <div className="etichetta">In questa chat ha fatto</div>

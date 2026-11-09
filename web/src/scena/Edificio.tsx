@@ -6,6 +6,7 @@ import type { ThreeEvent } from '@react-three/fiber';
 import { useLayoutEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import type { Esito } from '../../../motore/tipi.ts';
+import { materialePavimento } from './materiali.ts';
 import { Modello, precarica, type PropsModello } from './Modello.tsx';
 import { Navetta } from './Navetta.tsx';
 import { ARCHIVIO, COLORI, DIVISORIO_X, LINEA, LIVELLI, PAVIMENTO, SALA, STAMPANTE, TAVOLO, UFFICIO_UTENTE } from './pianta.ts';
@@ -39,16 +40,21 @@ function Arredo({ n, ...resto }: { n: string } & Omit<PropsModello, 'url'>) {
 
 const mat = (color: string, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...extra });
 const M = {
-  pavMagazzino: mat('#d6d9dd', { roughness: 0.75 }),
-  pavUfficio: mat('#eceef0', { roughness: 0.7 }),
+  // Magazzino in cemento a lastre grandi, uffici in piastrelle chiare: le due zone si distinguono
+  // anche dall'alto. Il bordo scuro lungo i muri è un'ombra finta che regge anche sul telefono.
+  pavMagazzino: materialePavimento({ colore: '#c9cdd2', piastrella: 3, giunto: 0.16, macchie: 0.09, roughness: 0.8, bordo: { rettangolo: [-24, -15, 24, 15], forza: 0.2 }, pareti: [[DIVISORIO_X, -15, DIVISORIO_X, 1.6], [DIVISORIO_X, 4.6, DIVISORIO_X, 15]] }),
+  pavUfficio: materialePavimento({ colore: '#f2f3f5', piastrella: 1.2, giunto: 0.07, macchie: 0.02, roughness: 0.6, bordo: { rettangolo: [-24, -15, 24, 15], forza: 0.14 }, pareti: [[DIVISORIO_X, -15, DIVISORIO_X, 1.6], [DIVISORIO_X, 4.6, DIVISORIO_X, 15]] }),
   tappetoSala: mat('#16181b', { roughness: 0.9 }),
   parete: mat('#fafbfc', { roughness: 0.85 }),
   pareteScura: mat('#1a1c1f', { roughness: 0.8 }),
+  // La testa dei muri è nera, come la sezione in un disegno d'architettura: disegna la pianta.
+  cappello: mat('#141518', { roughness: 0.6 }),
   telaio: mat('#141518', { roughness: 0.4, metalness: 0.3 }),
-  vetro: new THREE.MeshStandardMaterial({ color: '#e3eef7', transparent: true, opacity: 0.12, roughness: 0.25, metalness: 0, depthWrite: false }),
+  // Vetro appena azzurrato e lucido: si vede la stanza come volume, e riflette lo studio HDRI.
+  vetro: new THREE.MeshStandardMaterial({ color: '#cfe0ec', transparent: true, opacity: 0.26, roughness: 0.04, metalness: 0.15, envMapIntensity: 1.8, depthWrite: false }),
   legno: mat('#f4f5f6', { roughness: 0.5 }),
   scuro: mat('#16181b', { roughness: 0.5 }),
-  giallo: mat('#b5f900', { roughness: 0.6 }),
+  giallo: mat('#b5f900', { roughness: 0.6, emissive: '#b5f900', emissiveIntensity: 0.18 }),
   blu: mat('#141518', { roughness: 0.45, metalness: 0.25 }),
   arancio: mat('#b5f900', { roughness: 0.5, metalness: 0.1 }),
   grigioPiano: mat('#d9dce0', { roughness: 0.6 }),
@@ -57,6 +63,7 @@ const M = {
 const COLORE_ESITO: Record<Esito | 'aperto', string> = {
   accordo: COLORI.accordo,
   limite_round: COLORI.parziale,
+  limite: COLORI.parziale,
   stallo: COLORI.disaccordo,
   chiuso_da_utente: COLORI.neutro,
   aperto: '#7aa7d9',
@@ -73,6 +80,18 @@ function Pavimento() {
     { x: -15.5, z: -13.2, w: 15, d: 0.07 },
     { x: -13.5, z: 11.3, w: 19, d: 0.07 },
   ], []);
+  const cornice = useMemo(() => {
+    const w = SALA.larga - 0.5 - 0.3;
+    const d = SALA.profonda - 0.5 - 0.3;
+    const [x, z] = SALA.centro;
+    const s = 0.04;
+    return [
+      { x, z: z - d / 2, w: w + s, d: s },
+      { x, z: z + d / 2, w: w + s, d: s },
+      { x: x - w / 2, z, w: s, d },
+      { x: x + w / 2, z, w: s, d },
+    ];
+  }, []);
   return (
     <group>
       <mesh material={M.pavMagazzino} rotation-x={-Math.PI / 2} position={[(x0 + DIVISORIO_X) / 2, 0, 0]} receiveShadow>
@@ -89,16 +108,23 @@ function Pavimento() {
       <mesh rotation-x={-Math.PI / 2} position={[SALA.centro[0], 0.003, SALA.centro[1]]} material={M.tappetoSala} receiveShadow>
         <planeGeometry args={[SALA.larga - 0.5, SALA.profonda - 0.5]} />
       </mesh>
+      {/* Filo lime lungo il bordo del tappeto: la sala è il palco, si trova a colpo d'occhio. */}
+      {cornice.map((r, i) => (
+        <mesh key={`c${i}`} material={M.giallo} rotation-x={-Math.PI / 2} position={[r.x, 0.005, r.z]}>
+          <planeGeometry args={[r.w, r.d]} />
+        </mesh>
+      ))}
     </group>
   );
 }
 
-// Parete piena con altezza a scelta.
+// Parete piena con altezza a scelta. Le facce del box sono +x, -x, +y, -y, +z, -z: la terza è la testa.
 function Parete({ da, a, altezza, spessore = 0.16, materiale = M.parete }: { da: [number, number]; a: [number, number]; altezza: number; spessore?: number; materiale?: THREE.Material }) {
   const dx = a[0] - da[0];
   const dz = a[1] - da[1];
+  const facce = useMemo(() => [materiale, materiale, M.cappello, materiale, materiale, materiale], [materiale]);
   return (
-    <mesh material={materiale} position={[(da[0] + a[0]) / 2, altezza / 2, (da[1] + a[1]) / 2]} rotation-y={-Math.atan2(dz, dx)} castShadow receiveShadow>
+    <mesh material={facce} position={[(da[0] + a[0]) / 2, altezza / 2, (da[1] + a[1]) / 2]} rotation-y={-Math.atan2(dz, dx)} castShadow receiveShadow>
       <boxGeometry args={[Math.hypot(dx, dz), altezza, spessore]} />
     </mesh>
   );

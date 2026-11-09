@@ -108,7 +108,8 @@ const info = () => ({
   claude: { modelli: MODELLI_CLAUDE, predefinito: MODELLO_CLAUDE_PREDEFINITO, ragionamento: RAGIONAMENTO_CLAUDE },
   codex: { modelli: modelliCodex(), predefinito: modelloCodexPredefinito() ?? null, ragionamento: RAGIONAMENTO_CODEX },
   attivi: motore.idPartiteAttive(),
-  maxRound: 10,
+  // Il catalogo della squadra con XP e livelli, e le procedure: la UI lo legge ogni 10 s.
+  ...motore.squadra(),
   cartelle: cartelle(),
   voce: voce.stato(),
   // Le skill dell'utente le hanno gli agenti solo con l'ambiente acceso: senza, partono vuoti.
@@ -145,7 +146,7 @@ function eventi(req: IncomingMessage, res: ServerResponse, id: string): void {
   const ascolta = (idEvento: string, e: Evento) => {
     if (idEvento !== id) return;
     invia('evento', e);
-    if (e.tipo !== 'attivita' && e.tipo !== 'turno_inizio' && e.tipo !== 'avviso') istantanea();
+    if (e.tipo !== 'attivita' && e.tipo !== 'attivita_assistente' && e.tipo !== 'turno_inizio' && e.tipo !== 'avviso') istantanea();
   };
   motore.on('evento', ascolta);
   const battito = setInterval(() => res.write(': battito\n\n'), 15_000);

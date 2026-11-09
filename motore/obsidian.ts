@@ -5,6 +5,8 @@
 import { mkdirSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { IMPOSTAZIONI } from './impostazioni.ts';
+import { incarichiDi } from './prompt.ts';
+import { nomeAssistente } from './squadra.ts';
 import { NOME, altro, nomeAutore, type Dibattito, type Esito } from './tipi.ts';
 
 export const CARTELLA_NOTE = 'Decisioni';
@@ -16,6 +18,7 @@ export function cartellaNoteSalvate(): string {
 const ESITO: Record<Esito, string> = {
   accordo: 'accordo pieno',
   stallo: 'stallo',
+  limite: 'chiusa al limite di sicurezza',
   limite_round: 'round finiti senza accordo pieno',
   chiuso_da_utente: 'chiusa dall\'utente',
 };
@@ -30,6 +33,7 @@ export function notaDecisione(d: Dibattito): string {
   const v = d.verifica?.testo;
   const data = d.creato.slice(0, 10);
   const p = d.produzione;
+  const incarichi = incarichiDi(d);
   return [
     '---',
     'type: decisione',
@@ -61,9 +65,15 @@ export function notaDecisione(d: Dibattito): string {
     ] : ['_Sintesi non disponibile._', '']),
     ...(v && !v.approvata ? ['## Correzioni del revisore', '', voci([...v.correzioni, ...v.disaccordi_mancanti]), ''] : []),
     ...(d.dossier ? [`Materiale letto: ${d.dossier.file.length} file della cartella "${d.dossier.cartella}".`, ''] : []),
+    ...(incarichi.length ? [
+      '## Lavoro della squadra', '',
+      voci(incarichi.map((i) => `${nomeAssistente(undefined, i.assistente)} (per ${NOME[i.da]}): ${i.compito.replace(/\s+/g, ' ').slice(0, 160)} · ${i.stato}`)),
+      '',
+    ] : []),
     ...(p ? [
       '## Produzione', '',
-      `Stato: ${p.stato}.${p.collaudo ? ` Collaudo di Codex: ${p.collaudo.approvato ? 'superato' : 'non superato'}. ${p.collaudo.commento}` : ''}`,
+      `Stato: ${p.stato}.${p.procedura ? ` Procedura: ${p.procedura}.` : ''}${p.collaudo ? ` Collaudo: ${p.collaudo.approvato ? 'superato' : 'non superato'}. ${p.collaudo.commento}` : ''}`,
+      ...(p.pacchetti?.length ? ['', 'Pacchetti:', voci(p.pacchetti.map((x) => `${x.titolo} · ${nomeAssistente(undefined, x.assistente)} · ${x.stato}`))] : []),
       ...(p.file.length ? ['', 'File consegnati:', voci(p.file.map((f) => `\`${f.percorso}\``))] : []),
       ...(p.collaudo?.problemi.length ? ['', 'Problemi trovati:', voci(p.collaudo.problemi)] : []),
       '',

@@ -1,5 +1,5 @@
-// Prototipo da terminale: lancia un dibattito vero e lo mostra mentre si svolge.
-//   node motore/cli.ts "domanda" [--round 3] [--claude <modello>] [--codex <modello>] ...
+// Prototipo da terminale: lancia una riunione vera e la mostra mentre si svolge.
+//   node motore/cli.ts "domanda" [--claude <modello>] [--codex <modello>] [--web] [--confronto] ...
 //   node motore/cli.ts --riprendi <id> [--nota "testo"] [--concludi]
 //   node motore/cli.ts --elenco | --modelli | --verifica | --esporta <id>
 //   node motore/cli.ts --cartelle | --autorizza <nome> <percorso> | --togli <nome>
@@ -9,11 +9,13 @@ import { parseArgs } from 'node:util';
 import { MODELLI_CLAUDE, modelliCodex, RAGIONAMENTO_CLAUDE, RAGIONAMENTO_CODEX, verificaAccessi } from './ambiente.ts';
 import { aggiungiCartella, elencoCartelle, rimuoviCartella } from './cartelle.ts';
 import { Motore } from './dibattito.ts';
+import { nomeAssistente } from './squadra.ts';
 import { NOME, type Agente, type Evento } from './tipi.ts';
 
 const { values: o, positionals } = parseArgs({
   allowPositionals: true,
   options: {
+    // Non c'è più: la riunione si chiude da sola. Resta solo per avvisare chi lo usa ancora.
     round: { type: 'string' },
     apre: { type: 'string' },
     relatore: { type: 'string' },
@@ -50,6 +52,7 @@ const agente = (v: string | undefined, nome: string): Agente | undefined => {
 };
 
 const motore = new Motore();
+if (o.round !== undefined) console.warn('--round non c\'è più: la riunione si chiude da sola (accordo, stallo nel confronto o limite di sicurezza). Lo ignoro.');
 
 if (o.verifica) {
   const a = await verificaAccessi();
@@ -91,8 +94,9 @@ if (o.produci) {
   const d = await motore.produci(pid, o.base ?? null);
   const p = d.produzione!;
   console.log(`\nProduzione: ${p.stato}. Cantiere: ${p.cantiere}`);
-  if (p.collaudo) console.log(`Collaudo di Codex: ${p.collaudo.approvato ? 'superato' : 'non superato'}. ${p.collaudo.commento}`);
-  for (const c of p.chiamate) console.log(`${NOME[c.agente]}: ${Math.round(c.secondi)} s, token in ${c.uso.ingresso}, out ${c.uso.uscita}`);
+  for (const [i, x] of (p.pacchetti ?? []).entries()) console.log(`Pacchetto ${i + 1} «${x.titolo}» · ${nomeAssistente(undefined, x.assistente)}: ${x.stato}${x.scritti.length ? ` (${x.scritti.length} file)` : ''}`);
+  if (p.collaudo) console.log(`Collaudo: ${p.collaudo.approvato ? 'superato' : 'non superato'}. ${p.collaudo.commento}`);
+  for (const c of p.chiamate) console.log(`${c.assistente ? `${nomeAssistente(undefined, c.assistente)} (${NOME[c.agente]})` : NOME[c.agente]}: ${Math.round(c.secondi)} s, token in ${c.uso.ingresso}, out ${c.uso.uscita}`);
   process.exit(p.stato === 'pronta' ? 0 : 1);
 }
 if (o.esporta) {
@@ -108,12 +112,11 @@ if (o.riprendi) {
 } else {
   const domanda = o.file ? readFileSync(o.file, 'utf8') : positionals.join(' ');
   if (!domanda.trim()) {
-    console.error('Uso: node motore/cli.ts "domanda" [--round 3] [--claude modello] [--codex modello] [--web]');
+    console.error('Uso: node motore/cli.ts "domanda" [--claude modello] [--codex modello] [--web] [--confronto]');
     process.exit(2);
   }
   const d = motore.crea({
     domanda,
-    maxRound: o.round ? Number(o.round) : undefined,
     apre: agente(o.apre, 'apre'),
     relatore: agente(o.relatore, 'relatore'),
     claude: { modello: o.claude, ragionamento: o['claude-ragionamento'] },
@@ -128,23 +131,31 @@ if (o.riprendi) {
   id = d.id;
   for (const n of o.nota ?? []) motore.intervieni(id, n);
   const c = d.config;
-  console.log(`Dibattito ${id} · ${c.maxRound} round · Claude ${c.claude.modello} · Codex ${c.codex.modello ?? 'predefinito'} (${c.codex.ragionamento})${c.ricercaWeb ? ' · web' : ''}${c.memoria ? ' · note dell\'utente' : ''}${d.dossier ? ` · ${d.dossier.file.length} file di "${d.dossier.cartella}"` : ''}`);
+  console.log(`Riunione ${id} · Claude ${c.claude.modello} · Codex ${c.codex.modello ?? 'predefinito'} (${c.codex.ragionamento})${c.ricercaWeb ? ' · web' : ''}${c.memoria ? ' · note dell\'utente' : ''}${d.dossier ? ` · ${d.dossier.file.length} file di "${d.dossier.cartella}"` : ''}`);
 }
 
 const ora = () => new Date().toLocaleTimeString('it-CH');
 let ultimaFase = '';
 motore.on('evento', (_id: string, e: Evento) => {
-  if (e.tipo === 'attivita') {
-    const chiave = `${e.agente}:${e.fase}`;
+  if (e.tipo === 'attivita' || e.tipo === 'attivita_assistente') {
+    const chi = e.tipo === 'attivita' ? NOME[e.agente] : nomeAssistente(undefined, e.assistente);
+    const chiave = `${chi}:${e.fase}`;
     if (chiave === ultimaFase) return;
     ultimaFase = chiave;
-    console.log(`  · ${ora()} ${NOME[e.agente]} ${e.fase === 'ragionamento' ? 'sta ragionando' : e.fase === 'risposta' ? 'sta scrivendo' : 'in attesa'}…`);
+    console.log(`  · ${ora()} ${chi} ${e.fase === 'ragionamento' ? 'sta ragionando' : e.fase === 'risposta' ? 'sta scrivendo' : e.fase === 'strumento' ? `· ${e.testo ?? 'usa uno strumento'}` : 'in attesa'}…`);
     return;
   }
   ultimaFase = '';
   if (e.tipo === 'turno_inizio') {
-    const titolo = e.ruolo === 'turno' ? `Round ${e.round} · turno ${e.indice} · ${NOME[e.agente]}` : `${e.ruolo === 'sintesi' ? 'Sintesi' : 'Verifica'} · ${NOME[e.agente]}`;
+    const titolo = e.ruolo === 'turno' ? `Intervento ${e.indice} · ${NOME[e.agente]}` : `${e.ruolo === 'sintesi' ? 'Sintesi' : 'Verifica'} · ${NOME[e.agente]}`;
     console.log(`\n━━ ${titolo} ${'━'.repeat(Math.max(4, 60 - titolo.length))}`);
+  } else if (e.tipo === 'incarico') {
+    const i = e.incarico;
+    const chi = nomeAssistente(undefined, i.assistente);
+    if (i.stato === 'in_corso') console.log(`\n  → ${chi} al lavoro (${i.id}, chiesto da ${NOME[i.da]}): ${i.compito.replace(/\s+/g, ' ').slice(0, 140)}`);
+    else if (i.stato === 'fatto') console.log(`  ✓ ${chi}: rapporto consegnato (${(i.rapporto ?? '').split(/\s+/).filter(Boolean).length} parole${i.chiamata ? `, ${i.chiamata.secondi} s, token in ${i.chiamata.uso.ingresso}, out ${i.chiamata.uso.uscita}` : ''})`);
+    else if (i.stato === 'fallito') console.log(`  ✗ ${chi}: incarico ${i.id} fallito (${i.errore ?? 'errore'})`);
+    else if (i.stato === 'annullato') console.log(`  · ${chi}: incarico ${i.id} annullato, la riunione è chiusa`);
   } else if (e.tipo === 'turno') {
     const r = e.turno.risposta;
     const c = e.turno.chiamata;
@@ -153,6 +164,7 @@ motore.on('evento', (_id: string, e: Evento) => {
     if (r.punti_aperti.length) console.log(`  ▸ punti aperti: ${r.punti_aperti.join(' | ')}`);
     if (r.cambi_di_posizione.length) console.log(`  ▸ cambi: ${r.cambi_di_posizione.join(' | ')}`);
     for (const n of e.turno.note) console.log(`  ▸ nota del motore: ${n}`);
+    for (const i of e.turno.incarichi ?? []) console.log(`  ▸ incarico ${i.id} per ${nomeAssistente(undefined, i.assistente)}: ${i.compito.replace(/\s+/g, ' ').slice(0, 120)}`);
     console.log(`  ▸ ${c.modello} · ${c.secondi} s · token in ${c.uso.ingresso} (cache ${c.uso.inCache}), out ${c.uso.uscita}${c.tentativi > 1 ? ` · ${c.tentativi} tentativi` : ''}`);
   } else if (e.tipo === 'stato') {
     if (e.stato === 'in_pausa') console.log(`\n[${ora()}] In pausa. Per riprendere: node motore/cli.ts --riprendi ${id} [--nota "..."]`);
@@ -185,7 +197,11 @@ if (o.concludi) motore.concludi(id);
 const finale = await motore.avvia(id);
 if (finale.stato === 'concluso') {
   const md = motore.esportaMarkdown(id);
-  const chiamate = [...finale.turni.map((t) => t.chiamata), ...(finale.sintesi ? [finale.sintesi.chiamata] : []), ...(finale.verifica ? [finale.verifica.chiamata] : [])];
+  // Le chiamate degli assistenti contano sull'abbonamento della loro CLI.
+  const chiamate = [
+    ...finale.turni.flatMap((t) => [t.chiamata, ...(t.incarichi ?? []).flatMap((i) => (i.chiamata ? [i.chiamata] : []))]),
+    ...(finale.sintesi ? [finale.sintesi.chiamata] : []), ...(finale.verifica ? [finale.verifica.chiamata] : []),
+  ];
   const somma = (a: Agente) => chiamate.filter((c) => c.agente === a).reduce((s, c) => ({ i: s.i + c.uso.ingresso, o: s.o + c.uso.uscita, n: s.n + 1, t: s.t + c.secondi }), { i: 0, o: 0, n: 0, t: 0 });
   for (const a of ['claude', 'codex'] as const) {
     const s = somma(a);

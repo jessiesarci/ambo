@@ -127,6 +127,9 @@ export function usaFinestra(onChiudi: () => void) {
   return pannello;
 }
 
+// "1 messaggio", "3 messaggi": il numero col nome giusto.
+export const quanti = (n: number, uno: string, molti: string) => `${n} ${n === 1 ? uno : molti}`;
+
 export function durata(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;

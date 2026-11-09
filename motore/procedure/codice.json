@@ -1,0 +1,12 @@
+{
+  "id": "codice",
+  "nome": "Codice",
+  "quando": "script, servizi, automazioni, modifiche a un progetto esistente",
+  "passi": [
+    { "assistente": "architettura", "fase": "piano" },
+    { "assistente": "analisi", "fase": "piano" },
+    { "assistente": "sviluppo", "fase": "produzione" },
+    { "assistente": "testi", "fase": "produzione" },
+    { "assistente": "controllo", "fase": "collaudo" }
+  ]
+}

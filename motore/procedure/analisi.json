@@ -1,0 +1,11 @@
+{
+  "id": "analisi",
+  "nome": "Analisi",
+  "quando": "scegliere tra alternative, stimare costi e rischi, consegnare un rapporto",
+  "passi": [
+    { "assistente": "ricerca", "fase": "piano" },
+    { "assistente": "analisi", "fase": "piano" },
+    { "assistente": "testi", "fase": "produzione" },
+    { "assistente": "controllo", "fase": "collaudo" }
+  ]
+}

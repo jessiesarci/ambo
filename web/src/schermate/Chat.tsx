@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNod
 import { NOME, nomeAutore, type Agente, type Destinatari, type Dibattito, type MessaggioChat } from '../../../motore/tipi.ts';
 import { api, type Accessi, type Info, type Riassunto } from '../api.ts';
 import { Finestra } from '../hud/Comandi.tsx';
-import { chiudiMarcatori, COLORE, durata, TestoMd } from '../hud/comuni.tsx';
+import { chiudiMarcatori, COLORE, durata, quanti, TestoMd } from '../hud/comuni.tsx';
 import { Puntini } from '../scena/Fumetti.tsx';
 import { ETICHETTE_ESITO, inCodaChat, type Vista, type VoceDiario } from '../stato.ts';
 import { leggi, puoDettare, puoLeggereSulPc as puoLeggere, puoRegistrare, smettiDiLeggere, usaVoce, type ModoVoce } from '../voce.ts';
@@ -137,7 +137,7 @@ function statoPartita(r: Riassunto | undefined): string {
   if (!r) return 'In partenza…';
   if (r.stato === 'concluso') {
     const esito = r.esito ? ETICHETTE_ESITO[r.esito] : 'Conclusa';
-    const prod = r.produzione === 'in_lavorazione' ? 'Claude costruisce' : r.produzione === 'collaudo' ? 'collaudo di Codex'
+    const prod = r.produzione === 'in_lavorazione' ? 'la squadra costruisce' : r.produzione === 'collaudo' ? 'collaudo di Codex'
       : r.produzione === 'pronta' ? (r.collaudo ? 'produzione pronta, collaudo superato' : 'produzione pronta, respinta dal collaudo')
         : r.produzione === 'errore' ? 'produzione ferma per un errore' : r.produzione === 'fermata' ? 'produzione fermata' : '';
     return prod ? `${esito} · ${prod}` : esito;
@@ -145,7 +145,7 @@ function statoPartita(r: Riassunto | undefined): string {
   if (r.stato === 'sintesi') return 'Scrivono la sintesi';
   if (r.stato === 'in_pausa') return 'In pausa';
   if (r.stato === 'errore') return 'Ferma per un errore';
-  if (r.inCorso || r.stato === 'in_corso') return `Partita in corso · ${r.turni} di ${r.maxRound * 2} interventi`;
+  if (r.inCorso || r.stato === 'in_corso') return `Riunione in corso · ${quanti(r.turni, 'intervento', 'interventi')}`;
   return 'In partenza…';
 }
 
@@ -517,7 +517,7 @@ function FinestraCompito({ d, onChiudi, onAvviata }: { d: Dibattito; onChiudi: (
     setInvio(true);
     setErrore(undefined);
     api.crea({
-      domanda: obiettivo.trim(), ...(titolo.trim() ? { titolo: titolo.trim() } : {}), daChat: d.id, modo: 'insieme', maxRound: 3,
+      domanda: obiettivo.trim(), ...(titolo.trim() ? { titolo: titolo.trim() } : {}), daChat: d.id, modo: 'insieme',
       memoria: d.config.memoria, claude: d.config.claude, codex: d.config.codex, ...(poi ? { poiProduzione: true } : {}),
     }).then(() => onAvviata(), (e: Error) => { setErrore(e.message); setInvio(false); });
   };
@@ -729,7 +729,7 @@ export function Chat(p: PropsChat) {
         <button className="tasto tasto-icona !min-h-9 !border-transparent !shadow-none" onClick={() => setElenco(true)} aria-label="Le tue chat"><Menu size={20} /></button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-titolo text-[15px] font-bold leading-tight">{d?.config.domanda ?? 'Nuova chat'}</h1>
-          <p className="truncate text-[11.5px] text-grafite">{d ? `${messaggi.filter((m) => m.autore === 'utente').length} messaggi${d.config.memoria === false ? ' · note spente' : haNote ? ' · con le tue note' : ''}` : 'Claude e Codex, sul tuo PC'}</p>
+          <p className="truncate text-[11.5px] text-grafite">{d ? `${quanti(messaggi.filter((m) => m.autore === 'utente').length, 'messaggio', 'messaggi')}${d.config.memoria === false ? ' · note spente' : haNote ? ' · con le tue note' : ''}` : 'Claude e Codex, sul tuo PC'}</p>
         </div>
         {p.onUfficio && <button className="tasto tasto-icona !min-h-9 md:hidden" onClick={p.onUfficio} aria-label="Guarda l'ufficio 3D"><Box size={18} /></button>}
         <div className="relative">
@@ -787,7 +787,7 @@ export function Chat(p: PropsChat) {
                 : <BollaAgente key={m.indice} m={m} leggendo={leggendo === m.indice} onLeggi={() => leggiQuesto(m)} scheda={scheda(m)} />))}
             {inInvio && <BollaUtente m={{ ...inInvio, ora: new Date().toISOString() }} inInvio />}
             {p.vista.parlante && p.vista.ruolo === 'chat' && <BollaDalVivo vista={p.vista} />}
-            {coda.length > 0 && !p.vista.parlante && <div className="flex items-center gap-2 text-[12px] text-grafite"><Puntini /> {coda.map((a) => NOME[a]).join(' e ')} sta per rispondere</div>}
+            {coda.length > 0 && !p.vista.parlante && <div className="flex items-center gap-2 text-[12px] text-grafite"><Puntini /> {coda.map((a) => NOME[a]).join(' e ')} {coda.length > 1 ? 'stanno' : 'sta'} per rispondere</div>}
           </>
         )}
         {d?.errore && !occupato && (

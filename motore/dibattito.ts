@@ -1,6 +1,6 @@
-// Il motore: fa parlare Claude e Codex a turno, decide quando il dibattito è finito, fa scrivere
-// la sintesi a uno e la fa verificare all'altro. Lo stato vive nell'archivio; gli eventi servono
-// a chi guarda: la CLI e la dashboard.
+// Il motore: tiene la riunione tra Claude e Codex (i due capi reparto, che parlano a turno e
+// affidano incarichi alla squadra), decide quando è finita, fa scrivere la sintesi a uno e la fa
+// verificare all'altro. Lo stato vive nell'archivio; gli eventi servono a chi guarda (CLI, dashboard).
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { createHash } from 'node:crypto';
@@ -18,21 +18,29 @@ import { creaArchivio, nuovoId, type Archivio } from './archivio.ts';
 import { creaDossier, disinnesca, elencoCartelle, trovaCartella } from './cartelle.ts';
 import { contestoDaChat, destinatari, leggiProposta, passa, prossimaRisposta, prossimoIndice, promptChat, titoloChat, ultimoDellUtente } from './chat.ts';
 import { cartellaNoteSalvate, scriviNota, scriviNotaChat } from './obsidian.ts';
-import { descriviFonti, noteAttive, scriviFontiNote } from './impostazioni.ts';
+import { descriviFonti, IMPOSTAZIONI, noteAttive, scriviFontiNote } from './impostazioni.ts';
 import { ErroreFormato, leggiRisposta, type RispostaChat } from './formato.ts';
 import { inMarkdown } from './markdown.ts';
 import { Annullato, ErroreAgente } from './processo.ts';
-import { lavora, MAX_CORREZIONI_PRODUZIONE, producibile, SCHEMA_COLLAUDO, SISTEMA_COLLAUDO, type Operai } from './produzione.ts';
-import { accetta, promptCorrezione, promptSintesi, promptTurno, promptVerifica } from './prompt.ts';
+import { lavora, MAX_CORREZIONI_PRODUZIONE, pacchettiDaFare, producibile, SCHEMA_COLLAUDO, SISTEMA_COLLAUDO, type Operai } from './produzione.ts';
+import {
+  accetta, incarichiDi, MAX_INTERVENTI_RIUNIONE, promptCorrezione, promptIncarico, promptSintesi, promptTurno, promptVerifica,
+} from './prompt.ts';
+import {
+  agentiPredefiniti, contaLavoro, creaCatalogo, fileSistema, MAX_INCARICHI_INTERVENTO, MAX_INCARICHI_RIUNIONE, MAX_RAPPORTO, nomeAssistente,
+  normalizzaPacchetti, normalizzaProcedura, pulisciCompito, sistemaAssistente, squadraConStatistiche, taglia, trovaAssistente, XP,
+  type Catalogo,
+} from './squadra.ts';
 import {
   altro, NOME,
-  type Agente, type Chiamata, type Corrente, type Config, type Destinatari, type Dibattito, type Esito, type Evento, type Fase,
-  type ConfigInput, type MessaggioChat, type RispostaTurno, type Sintesi, type StatoDibattito, type Strumento, type TipoRisposta, type Verifica,
+  type Agente, type Chiamata, type Corrente, type Config, type Destinatari, type Dibattito, type Esito, type Evento, type Fase, type Incarico,
+  type ConfigInput, type MembroSquadra, type MessaggioChat, type Procedura, type RispostaTurno, type Sintesi, type StatoDibattito, type Strumento, type TipoRisposta,
+  type Turno, type Verifica,
 } from './tipi.ts';
 
 export type { ConfigInput };
 
-type Valori = { turno: RispostaTurno; sintesi: Sintesi; verifica: Verifica; chat: RispostaChat };
+type Valori = { turno: RispostaTurno; sintesi: Sintesi; verifica: Verifica; chat: RispostaChat; incarico: RispostaChat };
 
 const SISTEMA_CLAUDE = join(RADICE, 'motore', 'istruzioni', 'sistema-claude.md');
 const SISTEMA_CODEX = join(RADICE, 'motore', 'istruzioni', 'sistema-codex.md');
@@ -41,14 +49,18 @@ const SISTEMA_CHAT_CODEX = join(RADICE, 'motore', 'istruzioni', 'sistema-chat-co
 // Gli accessi alle CLI si controllano una volta ogni tanto in chat: a ogni messaggio sarebbero secondi persi.
 const ACCESSI_CHAT_MS = 10 * 60_000;
 const SCHEMI = join(RADICE, 'motore', 'schemi');
-const MAX_ROUND = 10;
 const MAX_CORREZIONI = 2;
 
+// agente è la CLI che risponde. Con tipo 'incarico' lavora un assistente della squadra (assistente:
+// il suo id; sistema: le regole del motore più il suo ruolo, già messe insieme dal motore) con le
+// stesse funzioni di sola lettura dei capi reparto, sempre in una sessione nuova.
 export type ChiamaAgente = (op: {
   agente: Agente;
   tipo: TipoRisposta;
   prompt: string;
   sessione?: string;
+  assistente?: string;
+  sistema?: string;
   config: Config;
   cartella: string;
   signal: AbortSignal;
@@ -69,6 +81,17 @@ export const chiamaAgenteReale: ChiamaAgente = (op) => {
     signal: op.signal,
     suAttivita: op.suAttivita,
   };
+  // Un assistente: le sue istruzioni (regole comuni più il ruolo), testo libero, mai una sessione vecchia.
+  if (op.tipo === 'incarico') {
+    if (!op.assistente || !op.sistema) throw new ErroreAgente('incarico senza assistente o senza istruzioni', 'altro', false);
+    if (op.agente === 'claude') {
+      return turnoClaude({ ...comune, sessione: undefined, sistema: op.sistema, modello: op.config.claude.modello, ragionamento: op.config.claude.ragionamento });
+    }
+    return turnoCodex({
+      ...comune, sessione: undefined, istruzioniFile: fileSistema(op.sistema, `assistente-${op.assistente}`), schemaFile: undefined,
+      modello: op.config.codex.modello, ragionamento: op.config.codex.ragionamento,
+    });
+  }
   // In chat istruzioni sue e testo libero: niente blocco json, niente schema.
   const chat = op.tipo === 'chat';
   if (op.agente === 'claude') {
@@ -80,13 +103,24 @@ export const chiamaAgenteReale: ChiamaAgente = (op) => {
   });
 };
 
-// Gli operai del magazzino: Claude costruisce, Codex collauda (senza strumenti, solo la memoria).
+// Gli operai del magazzino: gli assistenti di produzione costruiscono (Claude nel cantiere), Codex
+// collauda, gli assistenti dei passi di collaudo rivedono. Collaudo e revisioni girano nella stanza
+// vuota in sola lettura: i file li vedono solo nel prompt.
 export const operaiReali = (stanza: string): Operai => ({
   costruisci,
   collauda: (op) => turnoCodex({
     prompt: op.prompt, istruzioniFile: SISTEMA_COLLAUDO, schemaFile: SCHEMA_COLLAUDO, modello: op.modello, ragionamento: op.ragionamento,
     ricercaWeb: false, memoria: op.memoria, cartella: stanza, timeoutMs: op.timeoutMs, signal: op.signal,
   }),
+  revisiona: (op) => op.motore === 'claude'
+    ? turnoClaude({
+      prompt: op.prompt, sistema: op.sistema, modello: op.modello ?? MODELLO_CLAUDE_PREDEFINITO, ragionamento: op.ragionamento,
+      ricercaWeb: false, memoria: op.memoria, cartella: stanza, timeoutMs: op.timeoutMs, signal: op.signal,
+    })
+    : turnoCodex({
+      prompt: op.prompt, istruzioniFile: fileSistema(op.sistema, `revisione-${op.assistente}`), schemaFile: SCHEMA_COLLAUDO, modello: op.modello,
+      ragionamento: op.ragionamento ?? 'medium', ricercaWeb: false, memoria: op.memoria, cartella: stanza, timeoutMs: op.timeoutMs, signal: op.signal,
+    }),
 });
 
 // I modelli finiscono negli argomenti delle CLI: solo nomi semplici.
@@ -96,8 +130,7 @@ export function normalizzaConfig(c: ConfigInput): Config {
   const domanda = c.domanda.trim();
   if (!domanda) throw new Error('la domanda è vuota');
   if (domanda.length > 20_000) throw new Error('la domanda supera i 20.000 caratteri');
-  const maxRound = Math.trunc(c.maxRound ?? 3);
-  if (!(maxRound >= 1 && maxRound <= MAX_ROUND)) throw new Error(`i round vanno da 1 a ${MAX_ROUND}`);
+  // Un maxRound mandato da una dashboard vecchia non conta più: la riunione si chiude da sola.
   for (const m of [c.claude?.modello, c.codex?.modello]) if (m !== undefined && !NOME_MODELLO.test(m)) throw new Error(`nome di modello non valido: ${m}`);
   if (c.claude?.ragionamento && !RAGIONAMENTO_CLAUDE.includes(c.claude.ragionamento)) throw new Error(`ragionamento Claude: ${RAGIONAMENTO_CLAUDE.join(', ')}`);
   if (c.codex?.ragionamento && !RAGIONAMENTO_CODEX.includes(c.codex.ragionamento)) throw new Error(`ragionamento Codex: ${RAGIONAMENTO_CODEX.join(', ')}`);
@@ -113,7 +146,6 @@ export function normalizzaConfig(c: ConfigInput): Config {
   if (c.poiProduzione !== undefined && typeof c.poiProduzione !== 'boolean') throw new Error('poiProduzione: vero o falso');
   return {
     domanda,
-    maxRound,
     apre: c.apre ?? 'claude',
     relatore: c.relatore ?? 'claude',
     claude: { modello: c.claude?.modello ?? MODELLO_CLAUDE_PREDEFINITO, ragionamento: c.claude?.ragionamento },
@@ -149,9 +181,11 @@ const oraBreve = (iso: string) => new Date(iso).toLocaleTimeString('it-CH', { ho
 const ESITO_BREVE: Record<Esito, string> = {
   accordo: 'accordo pieno',
   stallo: 'stallo, senza accordo',
+  limite: 'chiusa al limite di sicurezza, senza accordo pieno',
   limite_round: 'round finiti senza accordo pieno',
   chiuso_da_utente: 'chiusa dall\'utente',
 };
+const nomeDi = (id: string) => nomeAssistente(undefined, id);
 
 // La partita avviata da una scheda: la dice il messaggio del motore scritto quando è nata.
 export function partitaDaProposta(chat: Dibattito, indice: number): string | undefined {
@@ -161,11 +195,16 @@ export function partitaDaProposta(chat: Dibattito, indice: number): string | und
 // Lo stato di una partita detto agli agenti in chat, senza codici interni.
 export function statoAParole(d: Dibattito, alLavoro: boolean): string {
   const p = d.produzione;
+  const pk = p?.pacchetti ?? [];
+  const ora = pk.findIndex((x) => x.stato === 'in_corso');
+  const chiLavora = ora >= 0
+    ? `${nomeDi(pk[ora]!.assistente)} costruisce ${pk.length > 1 ? `il pacchetto ${ora + 1} di ${pk.length} («${pk[ora]!.titolo}»)` : 'la decisione'}`
+    : 'Claude costruisce';
   const prod = !p
     ? d.stato !== 'concluso' ? ''
       : d.config.poiProduzione && d.esito === 'accordo' ? 'produzione in partenza'
         : 'produzione non avviata (si avvia dalla partita, o dalla scheda in chat, con "Manda in produzione")'
-    : p.stato === 'in_lavorazione' ? `produzione in corso: Claude ${p.giro && p.giro > 1 ? `corregge (giro ${p.giro})` : 'costruisce'} nel cantiere`
+    : p.stato === 'in_lavorazione' ? `produzione in corso: ${p.giro && p.giro > 1 ? `si corregge dopo il collaudo (giro ${p.giro})` : chiLavora} nel cantiere`
       : p.stato === 'collaudo' ? 'produzione in collaudo: Codex controlla i file'
         : p.stato === 'pronta' ? `produzione pronta, ${p.file.length} file, ${p.collaudo?.approvato ? 'collaudo superato' : `collaudo non superato (${p.collaudo?.problemi.length ?? 0} problemi${p.giri?.length ? ` dopo ${p.giri.length + 1} giri` : ''})`}`
           : p.stato === 'errore' ? `produzione ferma per un errore: ${(p.errore ?? '').split('\n')[0]}`
@@ -173,8 +212,8 @@ export function statoAParole(d: Dibattito, alLavoro: boolean): string {
   const partita = d.stato === 'concluso'
     ? `partita conclusa, ${d.esito ? ESITO_BREVE[d.esito] : 'senza esito'}${d.verifica ? `, sintesi ${d.verifica.testo.approvata ? 'approvata' : 'non approvata'} da ${NOME[d.verifica.revisore]}` : ''}`
     : d.stato === 'errore' ? `partita ferma per un errore: ${(d.errore?.messaggio ?? '').split('\n')[0]}`
-      : d.stato === 'in_pausa' ? `partita in pausa al turno ${d.turni.length}`
-        : alLavoro ? `partita in corso, ${d.turni.length} interventi su ${d.config.maxRound * 2}`
+      : d.stato === 'in_pausa' ? `riunione in pausa dopo ${d.turni.length} interventi`
+        : alLavoro ? `riunione in corso, ${d.turni.length} interventi${incarichiDi(d).length ? ` e ${incarichiDi(d).length} incarichi alla squadra` : ''}`
           : d.stato === 'nuovo' ? 'partita in partenza' : `partita ferma (${d.stato})`;
   return [partita, prod].filter(Boolean).join('; ');
 }
@@ -196,23 +235,51 @@ export function normalizza(r: RispostaTurno, indice: number): string[] {
   return note;
 }
 
-// Quando fermarsi. Accordo vero = due interventi consecutivi, uno per agente, entrambi "accordo"
-// senza punti aperti: il secondo ha letto il primo e lo sottoscrive.
+// Quando la riunione è finita. Piano pronto = due interventi consecutivi, uno per capo reparto,
+// entrambi "accordo" senza punti aperti: il secondo ha letto il primo e lo sottoscrive. Lo stallo
+// vale solo nel confronto critico; il limite di sicurezza tiene a bada la quota.
 export function valuta(d: Dibattito): { esito: Esito; motivo: string } | null {
   const t = d.turni;
   const n = t.length;
   const [a, b] = [t[n - 2], t[n - 1]];
   if (a && b && accetta(a) && accetta(b)) {
-    return { esito: 'accordo', motivo: `${NOME[a.agente]} (turno ${a.indice}) e ${NOME[b.agente]} (turno ${b.indice}) hanno dichiarato accordo pieno, senza punti aperti, uno dopo l'altro.` };
+    return { esito: 'accordo', motivo: `${NOME[a.agente]} (intervento ${a.indice}) e ${NOME[b.agente]} (intervento ${b.indice}) hanno dichiarato accordo pieno, senza punti aperti, uno dopo l'altro: il piano è pronto.` };
   }
   const ultimi = t.slice(-4);
-  if (d.config.stallo && ultimi.length === 4 && ultimi.every((x) => x.risposta.stato === 'disaccordo' && x.risposta.cambi_di_posizione.length === 0)) {
-    return { esito: 'stallo', motivo: `Negli ultimi 4 interventi (turni ${ultimi[0]!.indice}-${ultimi[3]!.indice}) entrambi hanno dichiarato disaccordo senza cambiare posizione.` };
+  if (d.config.modo === 'confronto' && d.config.stallo && ultimi.length === 4 && ultimi.every((x) => x.risposta.stato === 'disaccordo' && x.risposta.cambi_di_posizione.length === 0)) {
+    return { esito: 'stallo', motivo: `Negli ultimi 4 interventi (${ultimi[0]!.indice}-${ultimi[3]!.indice}) entrambi hanno dichiarato disaccordo senza cambiare posizione.` };
   }
-  if (n >= d.config.maxRound * 2) {
-    return { esito: 'limite_round', motivo: `Raggiunto il massimo di ${d.config.maxRound} round senza due dichiarazioni di accordo pieno consecutive.` };
+  if (n >= MAX_INTERVENTI_RIUNIONE) {
+    return { esito: 'limite', motivo: `Chiusa al limite di sicurezza di ${MAX_INTERVENTI_RIUNIONE} interventi, senza due dichiarazioni di accordo pieno consecutive.` };
   }
   return null;
+}
+
+// Gli incarichi chiesti in un intervento: si tengono quelli con un assistente vero e un compito, nei
+// tetti per intervento e per riunione. Gli scarti si dicono (nelle note del motore), non si indovinano.
+export function accettaIncarichi(d: Dibattito, r: RispostaTurno, indice: number, agente: Agente, cat: Catalogo): { incarichi: Incarico[]; note: string[] } {
+  const incarichi: Incarico[] = [];
+  const note: string[] = [];
+  const richieste = r.incarichi ?? [];
+  if (richieste.length && indice >= MAX_INTERVENTI_RIUNIONE) {
+    note.push(`${richieste.length === 1 ? 'Un incarico chiesto' : `${richieste.length} incarichi chiesti`} nell'ultimo intervento: non eseguiti, la riunione si chiude.`);
+    return { incarichi, note };
+  }
+  let gia = incarichiDi(d).length;
+  const ora = new Date().toISOString();
+  for (const x of richieste) {
+    const a = trovaAssistente(cat.assistenti, x.assistente);
+    const compito = pulisciCompito(x.compito);
+    if (!a) note.push(`Incarico scartato: "${x.assistente}" non è nel catalogo della squadra.`);
+    else if (!compito) note.push(`Incarico per ${a.nome} scartato: il compito è vuoto.`);
+    else if (incarichi.length >= MAX_INCARICHI_INTERVENTO) note.push(`Incarico per ${a.nome} scartato: al massimo ${MAX_INCARICHI_INTERVENTO} per intervento.`);
+    else if (gia >= MAX_INCARICHI_RIUNIONE) note.push(`Incarico per ${a.nome} scartato: gli ${MAX_INCARICHI_RIUNIONE} incarichi della riunione sono finiti.`);
+    else {
+      incarichi.push({ id: `I${indice}.${incarichi.length + 1}`, assistente: a.id, da: agente, compito, stato: 'attesa', inizio: ora });
+      gia++;
+    }
+  }
+  return { incarichi, note };
 }
 
 interface Esecuzione {
@@ -228,6 +295,7 @@ export interface OpzioniMotore {
   verificaAccessi?: () => Promise<Accessi>;
   operai?: Operai;
   vault?: string | null; // dove scrivere le note delle decisioni; null = da nessuna parte
+  cartellaAgenti?: string | null; // gli agenti dell'utente (~/.claude/agents); null = solo gli standard
 }
 
 export class Motore extends EventEmitter {
@@ -238,6 +306,7 @@ export class Motore extends EventEmitter {
   private readonly dati: string;
   private readonly operai: Operai;
   private readonly vault: string | null;
+  private readonly agenti: string | null;
   private readonly attivi = new Map<string, Esecuzione>();
   // Il dibattito che corri() sta modificando: le note dell'utente durante l'esecuzione vanno qui,
   // altrimenti il salvataggio successivo del motore le cancellerebbe.
@@ -265,6 +334,21 @@ export class Motore extends EventEmitter {
     this.operai = op.operai ?? operaiReali(this.stanza);
     // Le note salvate vere solo per il motore vero: i test (con una cartella dati loro) non le toccano.
     this.vault = op.vault !== undefined ? op.vault : op.cartellaDati ? null : cartellaNoteSalvate();
+    // Gli agenti dell'utente (~/.claude/agents) solo con l'ambiente acceso (AMBO_AMBIENTE=1). I test
+    // non leggono mai la cartella vera: se vogliono degli agenti, la passano loro.
+    this.agenti = op.cartellaAgenti !== undefined ? op.cartellaAgenti : op.cartellaDati || !IMPOSTAZIONI.ambiente ? null : agentiPredefiniti();
+  }
+
+  // Chi si può chiamare in una partita: gli standard e, con l'ambiente acceso, gli agenti dell'utente;
+  // più le procedure. Si rilegge ogni volta: sono pochi file.
+  catalogo(_d?: Dibattito): Catalogo {
+    return creaCatalogo(this.dati, this.agenti);
+  }
+
+  // Per /api/info: il catalogo con XP e livelli, e le procedure.
+  squadra(): { squadra: MembroSquadra[]; procedure: Procedura[] } {
+    const c = this.catalogo();
+    return { squadra: squadraConStatistiche(this.dati, c.assistenti), procedure: c.procedure };
   }
 
   crea(config: ConfigInput): Dibattito {
@@ -294,7 +378,7 @@ export class Motore extends EventEmitter {
     // La chat da cui nasce lo sa subito: L'utente vede dov'è finito il compito, gli agenti che esiste.
     if (origine) {
       const dopo = cfg.poiProduzione ? ' Con l\'accordo pieno la decisione va in produzione da sola.' : ' Alla fine la mandi in produzione dalla partita.';
-      this.notaInChat(origine.id, `Partita avviata: «${titoloPartita(d)}». Claude e Codex preparano il piano, al massimo ${cfg.maxRound} round.${dopo}`, { tipo: 'avviata', partita: d.id, ...(cfg.daProposta ? { proposta: cfg.daProposta } : {}) });
+      this.notaInChat(origine.id, `Partita avviata: «${titoloPartita(d)}». Claude e Codex preparano il piano in riunione, con la squadra se serve.${dopo}`, { tipo: 'avviata', partita: d.id, ...(cfg.daProposta ? { proposta: cfg.daProposta } : {}) });
     }
     return d;
   }
@@ -311,7 +395,7 @@ export class Motore extends EventEmitter {
     const p = m.proposta;
     const d = this.crea({
       domanda: p.obiettivo, titolo: p.titolo, daChat: chatId, daProposta: indice, poiProduzione: p.dopo === 'produzione',
-      modo: 'insieme', maxRound: 3, memoria: chat.config.memoria, ricercaWeb: chat.config.ricercaWeb,
+      modo: 'insieme', memoria: chat.config.memoria, ricercaWeb: chat.config.ricercaWeb,
       claude: chat.config.claude, codex: chat.config.codex, ...(p.cartella ? { cartella: p.cartella } : {}),
     });
     return { id: d.id, gia: false };
@@ -499,7 +583,7 @@ export class Motore extends EventEmitter {
   private async rispostaChat(d: Dibattito, es: Esecuzione, agente: Agente, fino: number): Promise<void> {
     let vede = 0;
     const indice = prossimoIndice(d);
-    this.emetti(d, { tipo: 'turno_inizio', agente, ruolo: 'chat', indice, round: 0 });
+    this.emetti(d, { tipo: 'turno_inizio', agente, ruolo: 'chat', indice });
     // Le azioni dette dalla CLI mentre risponde restano sul messaggio: chi ha letto cosa, quale skill.
     const azioni: string[] = [];
     const ascolta = (id: string, e: Evento) => {
@@ -581,6 +665,8 @@ export class Motore extends EventEmitter {
           continue;
         }
         d.stato = 'in_pausa';
+        // Un incarico rimasto a metà si rifà alla ripresa, prima dell'intervento dopo.
+        for (const i of incarichiDi(d)) if (i.stato === 'in_corso') i.stato = 'attesa';
         this.archivio.salva(d);
         recuperati.push(d.id);
       }
@@ -590,6 +676,7 @@ export class Motore extends EventEmitter {
         p.stato = 'fermata';
         p.errore = 'interrotta da una chiusura o da un riavvio del motore';
         p.fine = new Date().toISOString();
+        for (const x of p.pacchetti ?? []) if (x.stato === 'in_corso') Object.assign(x, { stato: 'fallito', errore: p.errore, fine: p.fine });
         this.archivio.salva(d);
         recuperati.push(d.id);
       }
@@ -657,10 +744,16 @@ export class Motore extends EventEmitter {
           if (d.config.daChat) this.notaInChat(d.config.daChat, `Produzione di «${titoloPartita(d)}» non partita: ${mancanti.join('; ')}`, { tipo: 'errore', partita: d.id, ...(d.config.daProposta ? { proposta: d.config.daProposta } : {}) });
           return d;
         }
+        const catalogo = this.catalogo(d);
         if (d.config.daChat) {
-          this.notaInChat(d.config.daChat, `Produzione di «${titoloPartita(d)}» avviata: Claude costruisce nel cantiere${base ? ` partendo da una copia di "${base}"` : ', una cartella vuota'}, poi Codex collauda. Se il collaudo trova problemi, Claude corregge e Codex ricontrolla, al massimo ${MAX_CORREZIONI_PRODUZIONE} volte.`, { tipo: 'produzione', partita: d.id, ...(d.config.daProposta ? { proposta: d.config.daProposta } : {}) });
+          const { pacchetti } = pacchettiDaFare(d, catalogo);
+          const chi = [...new Set(pacchetti.map((x) => nomeAssistente(catalogo.assistenti, x.assistente)))].join(', ');
+          this.notaInChat(d.config.daChat, `Produzione di «${titoloPartita(d)}» avviata: ${pacchetti.length > 1 ? `${pacchetti.length} pacchetti (${chi})` : chi} nel cantiere${base ? ` partendo da una copia di "${base}"` : ', una cartella vuota'}, poi il collaudo. Se il collaudo trova problemi si corregge e si ricontrolla, al massimo ${MAX_CORREZIONI_PRODUZIONE} volte.`, { tipo: 'produzione', partita: d.id, ...(d.config.daProposta ? { proposta: d.config.daProposta } : {}) });
         }
-        await lavora(d, { dati: this.dati, base, operai: this.operai, signal: es.controllo.signal, aggiorna });
+        await lavora(d, {
+          dati: this.dati, base, operai: this.operai, signal: es.controllo.signal, aggiorna, catalogo,
+          attivita: (assistente, testo) => this.emetti(d, { tipo: 'attivita_assistente', assistente, fase: 'strumento', testo, strumento: 'file' }),
+        });
         this.archivio.salvaMarkdown(d.id, inMarkdown(d));
         return d;
       } finally {
@@ -743,22 +836,35 @@ export class Motore extends EventEmitter {
   }
 
   private emetti(d: Dibattito, e: Evento): void {
+    // Il testo dal vivo della risposta resta anche mentre si usa uno strumento; quello dello strumento va a parte.
+    const vivo = (c: Corrente, fase: Fase, testo: string | undefined, strumento: Strumento | undefined) => {
+      c.fase = fase;
+      if (fase === 'strumento') {
+        c.strumento = strumento;
+        c.azione = testo;
+      } else {
+        c.strumento = undefined;
+        c.azione = undefined;
+        if (testo !== undefined) c.testo = testo;
+      }
+    };
     if (e.tipo === 'turno_inizio') {
-      this.correnti.set(d.id, { agente: e.agente, ruolo: e.ruolo, indice: e.indice, round: e.round, inizio: Date.now(), fase: 'ragionamento', testo: '' });
+      this.correnti.set(d.id, { agente: e.agente, ruolo: e.ruolo, indice: e.indice, inizio: Date.now(), fase: 'ragionamento', testo: '' });
     } else if (e.tipo === 'attivita') {
       const c = this.correnti.get(d.id);
-      if (c?.agente === e.agente) {
-        c.fase = e.fase;
-        // Il testo dal vivo della risposta resta anche mentre usa uno strumento; quello dello strumento va a parte.
-        if (e.fase === 'strumento') {
-          c.strumento = e.strumento;
-          c.azione = e.testo;
-        } else {
-          c.strumento = undefined;
-          c.azione = undefined;
-          if (e.testo !== undefined) c.testo = e.testo;
-        }
+      if (c?.agente === e.agente && !c.assistente) vivo(c, e.fase, e.testo, e.strumento);
+    } else if (e.tipo === 'incarico') {
+      // Mentre un assistente lavora a un incarico, "chi lavora adesso" è lui (con la CLI del suo motore).
+      const c = this.correnti.get(d.id);
+      if (e.incarico.stato === 'in_corso') {
+        const a = this.catalogo(d).assistenti.find((x) => x.id === e.incarico.assistente);
+        this.correnti.set(d.id, { agente: a?.motore ?? 'claude', ruolo: 'incarico', indice: e.turno, inizio: Date.now(), fase: 'ragionamento', testo: '', assistente: e.incarico.assistente });
+      } else if (c?.assistente === e.incarico.assistente) {
+        this.correnti.delete(d.id);
       }
+    } else if (e.tipo === 'attivita_assistente') {
+      const c = this.correnti.get(d.id);
+      if (c?.assistente === e.assistente) vivo(c, e.fase, e.testo, e.strumento);
     } else if (
       e.tipo === 'turno' || e.tipo === 'concluso' || e.tipo === 'errore' || (e.tipo === 'messaggio' && e.messaggio.autore !== 'utente' && e.messaggio.autore !== 'motore')
       || (e.tipo === 'stato' && e.stato !== 'in_corso' && e.stato !== 'sintesi')
@@ -777,9 +883,18 @@ export class Motore extends EventEmitter {
     this.emetti(d, { tipo: 'stato', stato });
   }
 
+  // Gli incarichi che non sono ancora partiti restano annullati: la riunione non li aspetta.
   private chiudiDaUtente(d: Dibattito): void {
     d.esito = 'chiuso_da_utente';
-    d.motivoEsito = `Chiuso dall\'utente dopo ${d.turni.length} interventi.`;
+    d.motivoEsito = `Riunione chiusa dall\'utente dopo ${d.turni.length} interventi.`;
+    for (const t of d.turni) {
+      for (const i of t.incarichi ?? []) {
+        if (i.stato !== 'attesa' && i.stato !== 'in_corso') continue;
+        i.stato = 'annullato';
+        i.fine = new Date().toISOString();
+        this.emetti(d, { tipo: 'incarico', turno: t.indice, incarico: { ...i } });
+      }
+    }
   }
 
   private async corri(d: Dibattito, es: Esecuzione): Promise<Dibattito> {
@@ -821,7 +936,10 @@ export class Motore extends EventEmitter {
   private async fasi(d: Dibattito, es: Esecuzione): Promise<void> {
     if (!d.esito) {
       this.cambiaStato(d, 'in_corso');
+      // Prima gli incarichi dell'ultimo intervento (anche quelli rimasti a metà per una pausa),
+      // poi si guarda se la riunione è finita, poi parla l'altro.
       while (!d.esito) {
+        await this.incarichi(d, es);
         const fine = valuta(d);
         if (fine) {
           d.esito = fine.esito;
@@ -837,20 +955,27 @@ export class Motore extends EventEmitter {
       this.cambiaStato(d, 'sintesi');
       const relatore = d.config.relatore;
       const revisore = altro(relatore);
+      const catalogo = this.catalogo(d);
       if (!d.sintesi) {
-        this.emetti(d, { tipo: 'turno_inizio', agente: relatore, ruolo: 'sintesi', indice: d.turni.length + 1, round: 0 });
-        // Note arrivate quando il dibattito si stava chiudendo: le riceve chi scrive la sintesi.
+        this.emetti(d, { tipo: 'turno_inizio', agente: relatore, ruolo: 'sintesi', indice: d.turni.length + 1 });
+        // Note arrivate quando la riunione si stava chiudendo: le riceve chi scrive la sintesi.
         const note = d.daConsegnare[relatore];
-        const { valore, chiamata } = await this.chiedi(d, es, relatore, 'sintesi', () => promptSintesi(d, relatore, note));
+        const { valore, chiamata } = await this.chiedi(d, es, relatore, 'sintesi', () => promptSintesi(d, relatore, catalogo, note));
         d.daConsegnare[relatore] = [];
+        // Pacchetti e procedura si tengono solo se il catalogo li conosce: gli scarti si dicono.
+        const { pacchetti, note: scarti } = normalizzaPacchetti(valore.pacchetti ?? [], catalogo.assistenti);
+        const { procedura, nota } = normalizzaProcedura(valore.procedura, catalogo);
+        valore.pacchetti = pacchetti;
+        valore.procedura = procedura;
+        for (const x of [...scarti, ...(nota ? [nota] : [])]) this.emetti(d, { tipo: 'avviso', testo: x });
         d.sintesi = { relatore, testo: valore, chiamata };
         this.archivio.salva(d);
       }
       if (!d.verifica) {
-        this.emetti(d, { tipo: 'turno_inizio', agente: revisore, ruolo: 'verifica', indice: d.turni.length + 2, round: 0 });
+        this.emetti(d, { tipo: 'turno_inizio', agente: revisore, ruolo: 'verifica', indice: d.turni.length + 2 });
         const note = d.daConsegnare[revisore];
         const sintesi = d.sintesi.testo;
-        const { valore, chiamata } = await this.chiedi(d, es, revisore, 'verifica', () => promptVerifica(d, revisore, sintesi, note));
+        const { valore, chiamata } = await this.chiedi(d, es, revisore, 'verifica', () => promptVerifica(d, revisore, sintesi, catalogo, note));
         d.daConsegnare[revisore] = [];
         d.verifica = { revisore, testo: valore, chiamata };
         this.archivio.salva(d);
@@ -862,30 +987,99 @@ export class Motore extends EventEmitter {
     this.emetti(d, { tipo: 'concluso', esito: d.esito!, motivo: d.motivoEsito ?? '', approvata: d.verifica?.testo.approvata ?? null });
   }
 
+  // Un intervento di un capo reparto. Gli incarichi che chiede si registrano qui, in attesa: li
+  // esegue il giro dopo in fasi(), così una pausa a metà non li perde.
   private async turno(d: Dibattito, es: Esecuzione): Promise<void> {
     const precedente = d.turni.at(-1);
     const agente = precedente ? altro(precedente.agente) : d.config.apre;
     const indice = d.turni.length + 1;
-    const round = Math.ceil(indice / 2);
     const consegnate = d.daConsegnare[agente].length;
     const interventi = d.daConsegnare[agente].slice(0, consegnate);
+    const catalogo = this.catalogo(d);
 
-    this.emetti(d, { tipo: 'turno_inizio', agente, ruolo: 'turno', indice, round });
-    const { valore, chiamata } = await this.chiedi(d, es, agente, 'turno', () => promptTurno(d, agente), indice);
+    this.emetti(d, { tipo: 'turno_inizio', agente, ruolo: 'turno', indice });
+    const { valore, chiamata } = await this.chiedi(d, es, agente, 'turno', () => promptTurno(d, agente, catalogo), { indice });
     const note = normalizza(valore, indice);
-    const t = { indice, round, agente, risposta: valore, note, interventi, chiamata, ora: new Date().toISOString() };
+    const { incarichi, note: scarti } = accettaIncarichi(d, valore, indice, agente, catalogo);
+    note.push(...scarti);
+    const t: Turno = { indice, agente, risposta: valore, note, interventi, chiamata, ora: new Date().toISOString(), ...(incarichi.length ? { incarichi } : {}) };
     d.turni.push(t);
     // Le note arrivate mentre l'agente rispondeva restano per il suo turno successivo.
     d.daConsegnare[agente] = d.daConsegnare[agente].slice(consegnate);
     d.turnoInterrotto = undefined;
     this.archivio.salva(d);
+    for (const x of scarti) this.emetti(d, { tipo: 'avviso', testo: x });
     this.emetti(d, { tipo: 'turno', turno: t });
   }
 
+  // Gli incarichi dell'ultimo intervento ancora da fare, uno alla volta e in ordine.
+  private async incarichi(d: Dibattito, es: Esecuzione): Promise<void> {
+    const t = d.turni.at(-1);
+    if (!t) return;
+    for (const i of t.incarichi ?? []) {
+      if (i.stato === 'attesa' || i.stato === 'in_corso') await this.incarico(d, es, t, i);
+    }
+  }
+
+  // Un incarico: l'assistente lavora in sola lettura con la CLI del suo motore, in una sessione nuova.
+  // Se fallisce la riunione va avanti (i capi ricevono l'errore al posto del rapporto); si ferma
+  // tutto solo per gli errori che non si possono riprendere (crediti a consumo, strumenti vietati,
+  // server non previsti), come per i capi reparto.
+  private async incarico(d: Dibattito, es: Esecuzione, t: Turno, i: Incarico): Promise<void> {
+    const a = this.catalogo(d).assistenti.find((x) => x.id === i.assistente);
+    const emetti = () => this.emetti(d, { tipo: 'incarico', turno: t.indice, incarico: { ...i } });
+    const fallito = (messaggio: string) => {
+      i.stato = 'fallito';
+      i.errore = messaggio;
+      i.fine = new Date().toISOString();
+      contaLavoro(this.dati, [{ assistente: i.assistente, incarichi: 1, falliti: 1 }]);
+      this.archivio.salva(d);
+      emetti();
+    };
+    if (!a) {
+      // Un agente dell'utente tolto dal disco tra l'intervento e l'incarico.
+      fallito(`"${i.assistente}" non è più nel catalogo della squadra`);
+      return;
+    }
+    i.stato = 'in_corso';
+    i.inizio = new Date().toISOString();
+    this.archivio.salva(d);
+    emetti();
+    try {
+      const { valore, chiamata } = await this.chiedi(d, es, a.motore, 'incarico', () => promptIncarico(d, i, a), { assistente: a.id, sistema: sistemaAssistente(a) });
+      i.stato = 'fatto';
+      i.rapporto = taglia(valore.messaggio, MAX_RAPPORTO);
+      i.chiamata = chiamata;
+      i.xp = XP.rapporto;
+      i.fine = new Date().toISOString();
+      delete i.errore;
+      contaLavoro(this.dati, [{ assistente: a.id, xp: XP.rapporto, incarichi: 1, completati: 1 }]);
+      this.archivio.salva(d);
+      emetti();
+    } catch (e) {
+      if (e instanceof Annullato) {
+        // Pausa (o chiusura): l'incarico torna in attesa e si rifà alla ripresa.
+        i.stato = 'attesa';
+        this.archivio.salva(d);
+        emetti();
+        throw e;
+      }
+      const err = e instanceof ErroreAgente ? e : new ErroreAgente((e as Error).message, 'altro', true);
+      const riga = err.message.split('\n')[0]!;
+      fallito(riga);
+      if (!err.recuperabile) throw err;
+      this.emetti(d, { tipo: 'avviso', testo: `${a.nome}: incarico ${i.id} non riuscito (${riga}). La riunione continua.` });
+    }
+  }
+
   // Una chiamata all'agente, con le correzioni di formato e un nuovo tentativo sugli errori generici.
+  // Con op.assistente lavora un assistente: mai una sessione dei capi, attività per conto suo.
   private async chiedi<T extends TipoRisposta>(
-    d: Dibattito, es: Esecuzione, agente: Agente, tipo: T, prompt: () => string, indice = 0,
+    d: Dibattito, es: Esecuzione, agente: Agente, tipo: T, prompt: () => string, op: { indice?: number; assistente?: string; sistema?: string } = {},
   ): Promise<{ valore: Valori[T]; chiamata: Chiamata }> {
+    const indice = op.indice ?? 0;
+    const chi = op.assistente;
+    const nome = chi ? nomeAssistente(undefined, chi) : NOME[agente];
     let testoPrompt = prompt();
     let sessioneRifatta = false;
     let prosa: string | undefined;
@@ -899,21 +1093,24 @@ export class Motore extends EventEmitter {
       let r: EsitoCli;
       try {
         r = await this.chiama({
-          agente, tipo, prompt: testoPrompt, sessione: d.sessioni[agente], config: d.config, cartella: this.stanza,
+          agente, tipo, prompt: testoPrompt, sessione: chi ? undefined : d.sessioni[agente], config: d.config, cartella: this.stanza,
           signal: es.controllo.signal,
-          suAttivita: (fase, testo, strumento) => this.emetti(d, { tipo: 'attivita', agente, fase, testo, ...(strumento ? { strumento } : {}) }),
+          ...(chi ? { assistente: chi, sistema: op.sistema } : {}),
+          suAttivita: chi
+            ? (fase, testo, strumento) => this.emetti(d, { tipo: 'attivita_assistente', assistente: chi, fase, testo, ...(strumento ? { strumento } : {}) })
+            : (fase, testo, strumento) => this.emetti(d, { tipo: 'attivita', agente, fase, testo, ...(strumento ? { strumento } : {}) }),
         });
       } catch (e) {
         if (e instanceof Annullato) {
-          if (indice && d.sessioni[agente]) d.turnoInterrotto = { indice, agente };
+          if (indice && !chi && d.sessioni[agente]) d.turnoInterrotto = { indice, agente };
           throw e;
         }
         const err = e instanceof ErroreAgente ? e : new ErroreAgente((e as Error).message, 'altro', true);
-        d.chiamateFallite.push({ ora: new Date().toISOString(), agente, errore: err.message });
+        d.chiamateFallite.push({ ora: new Date().toISOString(), agente, errore: chi ? `${nome}: ${err.message}` : err.message });
         this.archivio.salva(d);
         // La CLI non trova più la sessione (cancellata dopo 30 giorni, o rovinata): se ne apre una
         // nuova e il prompt, senza sessione, riporta tutta la discussione.
-        if (err.tipo === 'sessione' && !sessioneRifatta) {
+        if (err.tipo === 'sessione' && !sessioneRifatta && !chi) {
           sessioneRifatta = true;
           delete d.sessioni[agente];
           this.archivio.salva(d);
@@ -928,7 +1125,8 @@ export class Motore extends EventEmitter {
         throw err;
       }
 
-      d.sessioni[agente] = r.sessione;
+      // La sessione di un assistente non si tiene: il prossimo incarico riparte da zero.
+      if (!chi) d.sessioni[agente] = r.sessione;
       totale.secondi += r.secondi;
       totale.ingresso += r.uso.ingresso;
       totale.inCache += r.uso.inCache;
@@ -940,17 +1138,18 @@ export class Motore extends EventEmitter {
         const chiamata: Chiamata = {
           agente, modello: r.modello, sessione: r.sessione, secondi: Math.round(totale.secondi * 10) / 10,
           uso: { ingresso: totale.ingresso, inCache: totale.inCache, uscita: totale.uscita },
-          controllo: r.controllo, tentativi,
+          controllo: r.controllo, tentativi, ...(chi ? { assistente: chi } : {}),
         };
         return { valore: valore as Valori[T], chiamata };
       } catch (e) {
         if (!(e instanceof ErroreFormato)) throw e;
-        if (correzioni >= MAX_CORREZIONI) throw new ErroreAgente(`${NOME[agente]}: risposta ancora non valida dopo ${MAX_CORREZIONI} correzioni (${e.message})`, 'formato', true);
+        if (correzioni >= MAX_CORREZIONI) throw new ErroreAgente(`${nome}: risposta ancora non valida dopo ${MAX_CORREZIONI} correzioni (${e.message})`, 'formato', true);
         correzioni++;
         const soloBlocco = tipo === 'turno' && agente === 'claude' && !!e.prosa;
         prosa = soloBlocco ? e.prosa : undefined;
-        testoPrompt = promptCorrezione(e.message, soloBlocco);
-        this.emetti(d, { tipo: 'avviso', testo: `${NOME[agente]}: formato non valido (${e.message}), chiedo la correzione.` });
+        // Un assistente non ha una sessione da correggere: riceve di nuovo l'incarico intero.
+        testoPrompt = chi ? prompt() : promptCorrezione(e.message, soloBlocco);
+        this.emetti(d, { tipo: 'avviso', testo: `${nome}: formato non valido (${e.message}), chiedo la correzione.` });
       }
     }
   }

@@ -2,7 +2,7 @@
 // L'istantanea è la verità; gli eventi portano solo ciò che è momentaneo (chi sta pensando,
 // il testo che arriva, gli effetti da animare).
 import {
-  altro, type Agente, type Corrente, type Dibattito, type Esito, type Evento, type MessaggioChat, type Ruolo, type StatoDichiarato, type Strumento,
+  altro, type Agente, type Corrente, type Dibattito, type Esito, type Evento, type Fase, type MessaggioChat, type Ruolo, type StatoDichiarato, type Strumento,
 } from '../../motore/tipi.ts';
 
 export type FaseVista = 'attesa' | 'ragionamento' | 'risposta' | 'strumento' | 'errore' | 'conclusione';
@@ -23,8 +23,23 @@ export interface VoceDiario {
   ora: number;
 }
 
+// Un assistente della squadra al lavoro adesso: arriva dagli eventi (incarico,
+// attivita_assistente) e, in riunione, dall'istantanea (Corrente.assistente). Intanto Claude e
+// Codex restano fermi: parlante resta vuoto, così la scena non li fa parlare al suo posto.
+export interface AssistenteVivo {
+  id: string;
+  dove: 'incarico' | 'produzione';
+  compito?: string;
+  turno?: number; // l'intervento che ha chiesto l'incarico
+  fase: Fase;
+  azione?: AzioneVista;
+  testo: string; // il rapporto che arriva, se la CLI lo manda a pezzi
+  da: number;
+}
+
 export type Effetto =
   | { id: number; tipo: 'colpo'; da: Agente; stato: StatoDichiarato }
+  | { id: number; tipo: 'rapporto'; assistente: string; ok: boolean }
   | { id: number; tipo: 'cambio'; agente: Agente; testo: string }
   | { id: number; tipo: 'nota'; testo: string }
   | { id: number; tipo: 'esito'; esito: Esito; approvata: boolean | null }
@@ -45,6 +60,7 @@ export interface Vista {
   effetti: Effetto[];
   azione: Partial<Record<Agente, AzioneVista>>;
   diario: VoceDiario[];
+  assistente?: AssistenteVivo;
 }
 
 export type Azione =
@@ -93,6 +109,17 @@ function fasiDaIstantanea(d: Dibattito, prima: Vista): Vista['fase'] {
   return prima.fase;
 }
 
+const riposo = (f: FaseVista): FaseVista => (f === 'ragionamento' || f === 'risposta' || f === 'strumento' ? 'attesa' : f);
+
+// L'assistente al lavoro resta finché l'istantanea non dice che ha finito: in riunione serve
+// l'incarico ancora in corso (e nessun altro al lavoro), in produzione una produzione attiva.
+function tieniAssistente(a: AssistenteVivo | undefined, d: Dibattito, c: Corrente | null | undefined): AssistenteVivo | undefined {
+  if (!a) return undefined;
+  if (a.dove === 'produzione') return d.produzione?.stato === 'in_lavorazione' || d.produzione?.stato === 'collaudo' ? a : undefined;
+  if (d.stato !== 'in_corso' || c === null || (c && c.assistente !== a.id)) return undefined;
+  return d.turni.some((t) => t.incarichi?.some((i) => i.assistente === a.id && i.stato === 'in_corso')) ? a : undefined;
+}
+
 export function riduci(v: Vista, a: Azione): Vista {
   switch (a.tipo) {
     case 'azzera':
@@ -106,10 +133,35 @@ export function riduci(v: Vista, a: Azione): Vista {
     case 'istantanea': {
       const d = a.dibattito;
       const fermo = d.stato !== 'in_corso' && d.stato !== 'sintesi';
-      const base = { ...v, dibattito: d, inCorso: a.inCorso, altrove: !!a.altrove, fase: fasiDaIstantanea(d, v) };
-      if (fermo) return { ...base, parlante: undefined, ruolo: undefined, testoParziale: '', inizioTurno: undefined, azione: {} };
-      // Il server dice chi lavora adesso: serve a chi apre o ricarica la pagina a metà turno.
       const c = a.corrente;
+      const base = { ...v, dibattito: d, inCorso: a.inCorso, altrove: !!a.altrove, fase: fasiDaIstantanea(d, v), assistente: tieniAssistente(v.assistente, d, c) };
+      if (fermo) return { ...base, parlante: undefined, ruolo: undefined, testoParziale: '', inizioTurno: undefined, azione: {} };
+      // Lavora un assistente con la CLI di Claude o di Codex: al lavoro c'è lui, non il capo reparto.
+      if (c?.assistente) {
+        const prima = v.assistente?.id === c.assistente ? v.assistente : undefined;
+        const compito = d.turni.find((t) => t.indice === c.indice)?.incarichi?.find((i) => i.assistente === c.assistente && i.stato === 'in_corso')?.compito;
+        return {
+          ...base,
+          parlante: undefined,
+          ruolo: 'incarico',
+          indice: c.indice,
+          inizioTurno: prima ? v.inizioTurno ?? c.inizio : c.inizio,
+          testoParziale: '',
+          fase: { claude: riposo(base.fase.claude), codex: riposo(base.fase.codex) },
+          azione: {},
+          assistente: {
+            id: c.assistente,
+            dove: 'incarico',
+            compito: compito ?? prima?.compito,
+            turno: c.indice,
+            fase: c.fase,
+            testo: c.testo ? pulisciParziale(c.testo) : prima?.testo ?? '',
+            azione: c.fase === 'strumento' && c.azione ? (prima?.azione?.testo === c.azione ? prima.azione : { testo: c.azione, strumento: c.strumento, da: Date.now() }) : undefined,
+            da: prima?.da ?? c.inizio,
+          },
+        };
+      }
+      // Il server dice chi lavora adesso: serve a chi apre o ricarica la pagina a metà turno.
       if (c) {
         return {
           ...base,
@@ -126,9 +178,7 @@ export function riduci(v: Vista, a: Azione): Vista {
       }
       // Nessuno al lavoro (o PC spento): nessuno resta a "ragionare" in scena.
       if (c === null) {
-        const riposo = (f: FaseVista): FaseVista => (f === 'ragionamento' || f === 'risposta' ? 'attesa' : f);
-        const riposo2 = (f: FaseVista): FaseVista => (f === 'strumento' ? 'attesa' : riposo(f));
-        return { ...base, parlante: undefined, ruolo: undefined, testoParziale: '', inizioTurno: undefined, azione: {}, fase: { claude: riposo2(base.fase.claude), codex: riposo2(base.fase.codex) } };
+        return { ...base, parlante: undefined, ruolo: undefined, testoParziale: '', inizioTurno: undefined, azione: {}, fase: { claude: riposo(base.fase.claude), codex: riposo(base.fase.codex) } };
       }
       return base;
     }
@@ -142,6 +192,7 @@ function applica(v: Vista, e: Evento, ora: number): Vista {
     case 'turno_inizio':
       return {
         ...v,
+        assistente: v.assistente?.dove === 'produzione' ? v.assistente : undefined,
         parlante: e.agente,
         ruolo: e.ruolo,
         indice: e.indice,
@@ -189,15 +240,64 @@ function applica(v: Vista, e: Evento, ora: number): Vista {
     case 'concluso':
       return {
         ...v,
+        assistente: v.assistente?.dove === 'produzione' ? v.assistente : undefined,
         fase: { claude: 'conclusione', codex: 'conclusione' },
         parlante: undefined,
         testoParziale: '',
         effetti: [...v.effetti, { id: nuovoId(), tipo: 'esito', esito: e.esito, approvata: e.approvata }],
       };
-    case 'produzione':
-      return e.testo ? { ...v, avvisi: [...v.avvisi.slice(-3), { id: nuovoId(), testo: e.testo, grave: e.stato === 'errore' }] } : v;
+    case 'produzione': {
+      const fermo = e.stato !== 'in_lavorazione' && e.stato !== 'collaudo';
+      const w = fermo && v.assistente?.dove === 'produzione' ? { ...v, assistente: undefined } : v;
+      return e.testo ? { ...w, avvisi: [...w.avvisi.slice(-3), { id: nuovoId(), testo: e.testo, grave: e.stato === 'errore' }] } : w;
+    }
+    // La squadra: un incarico che comincia mette al lavoro l'assistente e ferma i capi reparto.
+    case 'incarico': {
+      const i = e.incarico;
+      if (i.stato === 'in_corso') {
+        return {
+          ...v,
+          parlante: undefined,
+          ruolo: 'incarico',
+          indice: e.turno,
+          inizioTurno: ora,
+          testoParziale: '',
+          fase: { claude: riposo(v.fase.claude), codex: riposo(v.fase.codex) },
+          azione: {},
+          assistente: { id: i.assistente, dove: 'incarico', compito: i.compito, turno: e.turno, fase: 'ragionamento', testo: '', da: ora },
+        };
+      }
+      const suo = v.assistente?.id === i.assistente && v.assistente.dove === 'incarico';
+      const finito = i.stato === 'fatto' || i.stato === 'fallito';
+      return {
+        ...v,
+        assistente: suo ? undefined : v.assistente,
+        ...(suo && v.ruolo === 'incarico' ? { ruolo: undefined, inizioTurno: undefined } : {}),
+        effetti: finito ? [...v.effetti, { id: nuovoId(), tipo: 'rapporto', assistente: i.assistente, ok: i.stato === 'fatto' }] : v.effetti,
+      };
+    }
+    // In riunione arriva con l'incarico già cominciato; in produzione è l'unico segnale di chi lavora.
+    case 'attivita_assistente': {
+      const prod = v.dibattito?.produzione;
+      const inProduzione = prod?.stato === 'in_lavorazione' || prod?.stato === 'collaudo';
+      const prima = v.assistente?.id === e.assistente ? v.assistente : undefined;
+      const azione = e.fase === 'strumento' ? { testo: e.testo ?? 'Usa uno strumento', strumento: e.strumento, da: ora } : undefined;
+      return {
+        ...v,
+        assistente: {
+          id: e.assistente,
+          dove: prima?.dove ?? (inProduzione ? 'produzione' : 'incarico'),
+          compito: prima?.compito,
+          turno: prima?.turno,
+          fase: e.fase,
+          azione,
+          testo: e.fase !== 'strumento' && e.testo !== undefined ? pulisciParziale(e.testo) : prima?.testo ?? '',
+          da: prima?.da ?? ora,
+        },
+      };
+    }
     case 'stato':
-      if (e.stato === 'in_pausa' || e.stato === 'aperta') return { ...v, parlante: undefined, testoParziale: '', inizioTurno: undefined, azione: {}, fase: { claude: 'attesa', codex: 'attesa' } };
+      if (e.stato === 'in_pausa' || e.stato === 'aperta') return { ...v, parlante: undefined, testoParziale: '', inizioTurno: undefined, azione: {}, fase: { claude: 'attesa', codex: 'attesa' }, assistente: v.assistente?.dove === 'produzione' ? v.assistente : undefined };
       return v;
   }
 }
@@ -245,6 +345,7 @@ export const ETICHETTE_STATO: Record<StatoDichiarato, string> = {
 export const ETICHETTE_ESITO: Record<Esito, string> = {
   accordo: 'Consenso raggiunto',
   stallo: 'Stallo',
+  limite: 'Chiusa al limite di sicurezza',
   limite_round: 'Round finiti',
   chiuso_da_utente: 'Partita chiusa',
 };

@@ -1,11 +1,12 @@
 // Chiamate al motore, sullo stesso server locale (http://127.0.0.1:4317): niente parte online.
-import type { Agente, ConfigInput, Corrente, Destinatari, Dibattito, Esito, Evento, StatoDibattito } from '../../motore/tipi.ts';
+import type { Agente, ConfigInput, Corrente, Destinatari, Dibattito, Esito, Evento, MembroSquadra, Procedura, StatoDibattito } from '../../motore/tipi.ts';
 
 export interface Info {
   claude: { modelli: string[]; predefinito: string; ragionamento: string[] };
   codex: { modelli: string[]; predefinito: string | null; ragionamento: string[] };
   attivi: string[];
-  maxRound: number;
+  squadra?: MembroSquadra[]; // il catalogo degli assistenti con XP e livello
+  procedure?: Procedura[];
   cartelle?: { nome: string; file: number }[];
   voce?: { disponibile: boolean; acceso: boolean; modello: string; perche?: string };
   skill?: Record<Agente, { nome: string; descrizione: string; fonte: string }[]>; // a disposizione sul PC, in sola lettura
@@ -35,8 +36,8 @@ export interface Riassunto {
   esito: Esito | null;
   approvata: boolean | null;
   domanda: string;
-  turni: number;
-  maxRound: number;
+  turni: number; // gli interventi della riunione
+  incarichi?: number;
   claude: string;
   codex: string | null;
   inCorso: boolean;

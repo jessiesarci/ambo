@@ -37,11 +37,11 @@ function disegna(ctx: CanvasRenderingContext2D, d: Dibattito | undefined, fase: 
     return;
   }
 
-  const round = Math.max(1, Math.ceil(d.turni.length / 2));
+  const intervento = Math.max(1, d.turni.length);
   ctx.textAlign = 'right';
   ctx.fillStyle = COLORI.linea;
   ctx.font = '700 44px "Chakra Petch", sans-serif';
-  ctx.fillText(d.esito ? ETICHETTE_ESITO[d.esito].toUpperCase() : `ROUND ${round}/${d.config.maxRound}`, W - 40, 48);
+  ctx.fillText(d.esito ? ETICHETTE_ESITO[d.esito].toUpperCase() : `RIUNIONE · I${intervento}`, W - 40, 48);
   ctx.textAlign = 'left';
 
   const righe: ['claude' | 'codex', string, string][] = [
@@ -96,7 +96,7 @@ export function Schermo({ dibattito, fase }: { dibattito?: Dibattito; fase: Reco
   // Si ridisegna (e si ricarica la texture sulla GPU) solo quando cambia quello che si vede, non a
   // ogni pezzo di testo in arrivo.
   const c = consenso(dibattito);
-  const chiave = dibattito ? [dibattito.id, dibattito.turni.length, dibattito.config.maxRound, dibattito.esito ?? '', fase.claude, fase.codex, c.claude ?? '', c.codex ?? ''].join('|') : 'vuoto';
+  const chiave = dibattito ? [dibattito.id, dibattito.turni.length, dibattito.esito ?? '', fase.claude, fase.codex, c.claude ?? '', c.codex ?? ''].join('|') : 'vuoto';
   useEffect(() => {
     const ctx = canvas.getContext('2d')!;
     const ridisegna = () => {

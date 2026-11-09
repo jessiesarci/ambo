@@ -83,7 +83,7 @@ export function ComandiDalVivo({ vista, onRegistro, onDocumento, onErrore }: { v
         <Finestra titolo="Concludere adesso?" onChiudi={() => setConferma(false)}>
           <p className="text-[14px]">{bloccato
             ? 'La partita si chiude con quello che c\x27è, senza chiamare di nuovo gli agenti: dopo questo errore non si riprende.'
-            : 'Il turno in corso si ferma e si passa alla sintesi. Se non si sono dichiarati d\x27accordo, il documento lo dirà: nessun accordo viene inventato.'}</p>
+            : 'L\x27intervento in corso si ferma, gli incarichi non ancora partiti si annullano e si passa alla sintesi. Se non si sono dichiarati d\x27accordo, il documento lo dirà: nessun accordo viene inventato.'}</p>
           <div className="mt-4 flex justify-end gap-2">
             <button className="tasto" onClick={() => setConferma(false)}>Continua la partita</button>
             <button className="tasto tasto-primario" disabled={occupato} onClick={() => esegui(async () => { await api.concludi(d.id); setConferma(false); })}>

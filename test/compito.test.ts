@@ -126,11 +126,11 @@ test('Avvia: una partita sola per scheda, il motore lo scrive in chat, con l\'ac
   assert.match(ultimo, /\[Motore · [^\]]*\]\nPartita avviata/);
   assert.match(ultimo, /STATO DEL PROGRAMMA[\s\S]*«Pagina prenotazioni della palestra»[\s\S]*produzione pronta, 1 file, collaudo superato/);
   // Anche le partite sanno com'è fatto il programma: niente "premi Trasforma in compito".
-  assert.match(f.prompt.claude[1]!, /COME FUNZIONA IL PROGRAMMA: questa partita è già in corso/);
+  assert.match(f.prompt.claude[1]!, /COME FUNZIONA IL PROGRAMMA: questa riunione è già in corso/);
   assert.match(f.prompt.claude[1]!, /con l'accordo pieno la produzione parta da sola/);
 });
 
-test('produzione: il collaudo respinge, Claude corregge, Codex ricontrolla', async () => {
+test('produzione: il collaudo respinge, Paolo corregge, Codex ricontrolla', async () => {
   const costruzioni: string[] = [];
   const collaudi: string[] = [];
   const operai: Operai = {
@@ -146,9 +146,9 @@ test('produzione: il collaudo respinge, Claude corregge, Codex ricontrolla', asy
         : { approvato: true, problemi: [], commento: 'ora regge' }));
     },
   };
-  const f = finto({ claude: [turnoClaude('proposta'), sintesi], codex: [turnoCodex('accordo'), verifica] });
+  const f = finto({ claude: [turnoClaude('proposta'), turnoClaude('accordo'), sintesi], codex: [turnoCodex('accordo'), verifica] });
   const m = new Motore({ cartellaDati: mkdtempSync(join(tmpdir(), 'debate-compito-')), chiamaAgente: f.chiamaAgente, verificaAccessi: accessiOk, operai });
-  const d0 = await m.avvia(m.crea({ domanda: 'Uno script che stampa 1', maxRound: 1, codex: { modello: 'finto' } }).id);
+  const d0 = await m.avvia(m.crea({ domanda: 'Uno script che stampa 1', codex: { modello: 'finto' } }).id);
   const d: Dibattito = await m.produci(d0.id, null);
   assert.equal(costruzioni.length, 2);
   assert.match(costruzioni[1]!, /CORREZIONE \(giro 2 di 3\)[\s\S]*"consol" non esiste/);
@@ -173,9 +173,9 @@ test('produzione: dopo due correzioni respinte il lavoro esce com\'è, respinto'
     },
     collauda: async () => esitoFinto(JSON.stringify({ approvato: false, problemi: ['x.md: incompleto'], commento: 'no' })),
   };
-  const f = finto({ claude: [turnoClaude('proposta'), sintesi], codex: [turnoCodex('accordo'), verifica] });
+  const f = finto({ claude: [turnoClaude('proposta'), turnoClaude('accordo'), sintesi], codex: [turnoCodex('accordo'), verifica] });
   const m = new Motore({ cartellaDati: mkdtempSync(join(tmpdir(), 'debate-compito-')), chiamaAgente: f.chiamaAgente, verificaAccessi: accessiOk, operai });
-  const d0 = await m.avvia(m.crea({ domanda: 'Un documento', maxRound: 1, codex: { modello: 'finto' } }).id);
+  const d0 = await m.avvia(m.crea({ domanda: 'Un documento', codex: { modello: 'finto' } }).id);
   const p = (await m.produci(d0.id, null)).produzione!;
   assert.equal(n, 3, 'costruzione più due correzioni, non di più');
   assert.equal(p.giro, 3);

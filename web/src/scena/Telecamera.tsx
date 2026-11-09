@@ -8,11 +8,13 @@ import * as THREE from 'three';
 import type { MapControls as MapControlsImpl } from 'three-stdlib';
 import type { Punto } from './pianta.ts';
 
-export type Inquadratura = 'tutto' | 'sala' | 'produzione' | 'utente';
+export type Inquadratura = 'tutto' | 'sala' | 'squadra' | 'produzione' | 'utente';
 
 export const INQUADRATURE: Record<Inquadratura, { etichetta: string; centro: Punto; larghezza: number; altezza: number }> = {
   tutto: { etichetta: 'Tutto', centro: [1, 0.5], larghezza: 50, altezza: 33 },
   sala: { etichetta: 'Sala', centro: [9, -5], larghezza: 15, altezza: 17 },
+  // Le scrivanie della parete nord, dove lavorano gli assistenti: la sala le taglia.
+  squadra: { etichetta: 'Squadra', centro: [12.2, -9.4], larghezza: 23, altezza: 12 },
   produzione: { etichetta: 'Produzione', centro: [-12, 0.5], larghezza: 25, altezza: 30 },
   utente: { etichetta: 'Tu', centro: [19.5, 9], larghezza: 11, altezza: 11 },
 };

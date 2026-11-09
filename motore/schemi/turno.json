@@ -1,12 +1,65 @@
 {
   "type": "object",
   "properties": {
-    "messaggio": { "type": "string", "description": "Il tuo intervento completo nel dibattito, in markdown" },
-    "stato": { "type": "string", "enum": ["proposta", "accordo", "accordo_parziale", "disaccordo"] },
-    "posizione": { "type": "string", "description": "La tua posizione attuale in 1-3 frasi" },
-    "punti_aperti": { "type": "array", "items": { "type": "string" } },
-    "cambi_di_posizione": { "type": "array", "items": { "type": "string" } }
+    "messaggio": {
+      "type": "string",
+      "description": "Il tuo intervento completo nella riunione, in markdown"
+    },
+    "stato": {
+      "type": "string",
+      "enum": [
+        "proposta",
+        "accordo",
+        "accordo_parziale",
+        "disaccordo"
+      ]
+    },
+    "posizione": {
+      "type": "string",
+      "description": "La tua posizione attuale in 1-3 frasi"
+    },
+    "punti_aperti": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cambi_di_posizione": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "incarichi": {
+      "type": "array",
+      "description": "Lavori da affidare agli assistenti della squadra dopo questo intervento; di solito vuoto",
+      "items": {
+        "type": "object",
+        "properties": {
+          "assistente": {
+            "type": "string",
+            "description": "L'id di un assistente del catalogo"
+          },
+          "compito": {
+            "type": "string",
+            "description": "Cosa deve fare, con tutto quello che gli serve sapere: non vede la riunione"
+          }
+        },
+        "required": [
+          "assistente",
+          "compito"
+        ],
+        "additionalProperties": false
+      }
+    }
   },
-  "required": ["messaggio", "stato", "posizione", "punti_aperti", "cambi_di_posizione"],
+  "required": [
+    "messaggio",
+    "stato",
+    "posizione",
+    "punti_aperti",
+    "cambi_di_posizione",
+    "incarichi"
+  ],
   "additionalProperties": false
 }

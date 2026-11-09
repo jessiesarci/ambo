@@ -1,15 +1,17 @@
-// Schermata iniziale sopra l'ufficio: nuova partita a sinistra, archivio a destra.
-// Sul telefono le due parti sono schede.
+// Schermata iniziale sopra l'ufficio: nuova partita a sinistra, archivio e squadra a destra.
+// Sul telefono le tre parti sono schede.
 import { Archive, CheckCircle2, CircleAlert, FolderLock, MessageSquare, Play, Swords } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Agente, ConfigInput } from '../../../motore/tipi.ts';
 import { api, type Accessi, type Info, type Riassunto } from '../api.ts';
-import { BottoneMarkdown } from '../hud/comuni.tsx';
+import { BottoneMarkdown, quanti } from '../hud/comuni.tsx';
+import { PannelloSquadra, SchedaAssistente } from '../hud/Squadra.tsx';
 import { ETICHETTE_ESITO } from '../stato.ts';
 import { suona } from '../suoni.ts';
 
 const ESITO_STILE: Record<string, string> = {
   accordo: 'bg-[#effcc9] text-[#3f5600]',
+  limite: 'bg-[#eceef1] text-[#3d4249]',
   limite_round: 'bg-[#eceef1] text-[#3d4249]',
   stallo: 'bg-[#f1f2f4] text-[#9b2626]',
   chiuso_da_utente: 'bg-[#eceef1] text-[#4a5058]',
@@ -25,7 +27,10 @@ export function Lobby({ info, accessi, archivio, serverGiu, onApri, onRivedi, on
   onCartelle?: () => void;
   onChat?: () => void;
 }) {
-  const [scheda, setScheda] = useState<'nuova' | 'archivio'>('nuova');
+  const [scheda, setScheda] = useState<'nuova' | 'archivio' | 'squadra'>('nuova');
+  // L'assistente di cui è aperta la scheda: un secondo tocco sulla stessa riga la chiude.
+  const [assistente, setAssistente] = useState<string | null>(null);
+  const caricamento = serverGiu ? 'Squadra non disponibile: il server del motore non risponde.' : undefined;
   return (
     <div className="pointer-events-none flex h-full flex-col gap-2">
       <div className="pannello pointer-events-auto flex flex-wrap items-center gap-3 self-start px-4 py-2.5">
@@ -38,9 +43,9 @@ export function Lobby({ info, accessi, archivio, serverGiu, onApri, onRivedi, on
       </div>
 
       <div className="pointer-events-auto flex gap-1 self-start md:hidden" role="tablist">
-        {(['nuova', 'archivio'] as const).map((s) => (
+        {(['nuova', 'archivio', 'squadra'] as const).map((s) => (
           <button key={s} role="tab" aria-selected={scheda === s} className={`tasto ${scheda === s ? 'tasto-primario' : ''}`} onClick={() => setScheda(s)}>
-            {s === 'nuova' ? 'Nuova partita' : `Archivio${archivio ? ` (${archivio.length})` : ''}`}
+            {s === 'nuova' ? 'Nuova partita' : s === 'archivio' ? `Archivio${archivio ? ` (${archivio.length})` : ''}` : 'Squadra'}
           </button>
         ))}
       </div>
@@ -49,10 +54,24 @@ export function Lobby({ info, accessi, archivio, serverGiu, onApri, onRivedi, on
         <div className={`${scheda === 'nuova' ? 'flex' : 'hidden'} min-h-0 w-full md:flex md:w-[420px]`}>
           <NuovaPartita info={info} accessi={accessi} archivio={archivio} serverGiu={serverGiu} onCreata={onApri} onCartelle={onCartelle} />
         </div>
-        <div className={`${scheda === 'archivio' ? 'flex' : 'hidden'} min-h-0 w-full md:flex md:w-[360px]`}>
-          <Archivio archivio={archivio} serverGiu={serverGiu} onApri={onApri} onRivedi={onRivedi} />
+        {/* Sul computer archivio e squadra stanno uno sopra l'altro, a destra; sul telefono sono schede. */}
+        <div className={`${scheda === 'nuova' ? 'hidden' : 'flex'} max-h-[70vh] min-h-0 w-full flex-col gap-2 md:flex md:max-h-none md:w-[360px]`}>
+          {/* L'archivio prende quello che gli serve, fino a metà colonna; il resto è della squadra. */}
+          <div className={`${scheda === 'archivio' ? 'flex' : 'hidden'} min-h-0 w-full md:flex md:max-h-[55%] md:flex-none`}>
+            <Archivio archivio={archivio} serverGiu={serverGiu} onApri={onApri} onRivedi={onRivedi} />
+          </div>
+          <div className={`${scheda === 'squadra' ? 'flex' : 'hidden'} min-h-0 w-full md:flex md:flex-1`}>
+            <PannelloSquadra aperto={assistente} onApri={(id) => setAssistente(assistente === id ? null : id)} caricamento={caricamento} />
+          </div>
         </div>
       </div>
+
+      {/* La scheda dell'assistente: accanto al pannello sul computer, sopra tutto sul telefono. */}
+      {assistente && (
+        <div className="pointer-events-auto fixed inset-x-2 top-16 z-30 flex justify-center md:inset-x-auto md:bottom-3 md:right-[384px] md:top-auto md:w-96">
+          <SchedaAssistente id={assistente} onChiudi={() => setAssistente(null)} />
+        </div>
+      )}
     </div>
   );
 }
@@ -73,7 +92,6 @@ const AGENTI_ETICHETTE = { claude: 'Claude', codex: 'Codex' };
 
 function NuovaPartita({ info, accessi, archivio, serverGiu, onCreata, onCartelle }: { info?: Info; accessi?: Accessi; archivio: Riassunto[] | null; serverGiu: boolean; onCreata: (id: string) => void; onCartelle?: () => void }) {
   const [domanda, setDomanda] = useState('');
-  const [round, setRound] = useState(3);
   const [claude, setClaude] = useState('');
   const [claudeRag, setClaudeRag] = useState('');
   const [codex, setCodex] = useState('');
@@ -104,7 +122,6 @@ function NuovaPartita({ info, accessi, archivio, serverGiu, onCreata, onCartelle
     try {
       const config: ConfigInput = {
         domanda,
-        maxRound: round,
         apre,
         relatore,
         claude: { modello: claude || undefined, ragionamento: claudeRag || undefined },
@@ -135,15 +152,6 @@ function NuovaPartita({ info, accessi, archivio, serverGiu, onCreata, onCartelle
         <span className="etichetta">{modo === 'insieme' ? 'L\'obiettivo' : 'La domanda'}</span>
         <textarea className="campo min-h-28 resize-y" value={domanda} onChange={(e) => setDomanda(e.target.value)} maxLength={20000} required placeholder={modo === 'insieme' ? 'Es. Preparare il piano per aggiungere la prenotazione dei corsi al sito di una palestra, con tempi e costi.' : 'Es. Per un sito di 20 pagine aggiornato di rado, meglio un generatore statico o un CMS? Budget limitato.'} />
       </label>
-
-      <div className="flex items-center justify-between gap-3">
-        <span className="etichetta">Round massimi</span>
-        <div className="flex items-center gap-1">
-          <button type="button" className="tasto tasto-icona" onClick={() => setRound((r) => Math.max(1, r - 1))} aria-label="Un round in meno">−</button>
-          <span className="w-8 text-center font-dati text-[16px] font-semibold" aria-live="polite">{round}</span>
-          <button type="button" className="tasto tasto-icona" onClick={() => setRound((r) => Math.min(info?.maxRound ?? 10, r + 1))} aria-label="Un round in più">+</button>
-        </div>
-      </div>
 
       <fieldset className="grid grid-cols-1 gap-2 rounded-xl border border-bordo p-2.5 sm:grid-cols-2">
         <legend className="etichetta px-1">Claude</legend>
@@ -220,7 +228,7 @@ function NuovaPartita({ info, accessi, archivio, serverGiu, onCreata, onCartelle
 
 function Archivio({ archivio, serverGiu, onApri, onRivedi }: { archivio: Riassunto[] | null; serverGiu: boolean; onApri: (id: string) => void; onRivedi: (id: string) => void }) {
   return (
-    <section className="pannello pointer-events-auto flex max-h-[70vh] w-full flex-col overflow-hidden md:max-h-none" aria-label="Archivio delle partite">
+    <section className="pannello pointer-events-auto flex max-h-[70vh] min-h-0 w-full flex-col overflow-hidden md:max-h-none" aria-label="Archivio delle partite">
       <div className="flex items-center gap-2 border-b border-bordo px-4 py-3">
         <Archive size={18} />
         <h2 className="font-titolo text-[18px] font-bold">Archivio</h2>
@@ -248,7 +256,10 @@ function Archivio({ archivio, serverGiu, onApri, onRivedi }: { archivio: Riassun
                   <BottoneMarkdown id={r.id} compatto />
                 </>
               )}
-              <span className="ml-auto font-dati text-[11px] text-grafite">{r.turni} interventi</span>
+              <span className="ml-auto text-right font-dati text-[11px] leading-tight text-grafite">
+                <span className="block">{quanti(r.turni, 'intervento', 'interventi')}</span>
+                {!!r.incarichi && <span className="block">{quanti(r.incarichi, 'incarico', 'incarichi')}</span>}
+              </span>
             </div>
           </li>
         ))}

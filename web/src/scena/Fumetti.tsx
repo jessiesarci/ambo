@@ -34,14 +34,22 @@ export function Fumetto({ tono, children }: { tono: TonoFumetto; children: React
   );
 }
 
-export function Targhetta({ nome, colore, sotto }: { nome: string; colore: string; sotto?: ReactNode }) {
+// livello e xp (da 0 a 1 verso il livello dopo) solo per gli assistenti della squadra: il chip
+// "Lv N" nella pillola e una barretta lime sotto, sottile per non coprire la scena.
+export function Targhetta({ nome, colore, sotto, livello, xp }: { nome: string; colore: string; sotto?: ReactNode; livello?: number; xp?: number }) {
   return (
     <div className="flex select-none flex-col items-center">
       {sotto}
       <div className="flex items-center gap-1.5 rounded-full bg-[#141518]/85 px-2 py-0.5 font-titolo text-[11px] font-semibold tracking-wide text-white shadow">
         <span className="h-2 w-2 rounded-full" style={{ background: colore }} />
         {nome}
+        {livello !== undefined && <span className="rounded-[4px] bg-[#b5f900] px-1 font-dati text-[9.5px] font-bold leading-[14px] text-[#141518]">Lv {livello}</span>}
       </div>
+      {xp !== undefined && (
+        <div className="mt-[3px] h-[3px] w-12 overflow-hidden rounded-full bg-[#141518]/55">
+          <div className="h-full rounded-full bg-[#b5f900]" style={{ width: `${Math.round(xp * 100)}%` }} />
+        </div>
+      )}
     </div>
   );
 }

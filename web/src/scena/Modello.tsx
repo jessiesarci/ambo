@@ -35,10 +35,15 @@ const temati = new WeakSet<THREE.Material>();
 export function applicaTema(mat: THREE.Material): void {
   if (temati.has(mat)) return;
   temati.add(mat);
+  // Plastica satinata: il bianco un po' più ruvido, il nero più lucido (prende i riflessi dello studio).
   mat.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <map_fragment>', `#include <map_fragment>
       float temaL = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-      diffuseColor.rgb = mix(vec3(0.011, 0.012, 0.014), vec3(0.84, 0.85, 0.87), smoothstep(0.015, 0.32, temaL));`);
+      float temaT = smoothstep(0.015, 0.3, temaL);
+      diffuseColor.rgb = mix(vec3(0.006, 0.0065, 0.0075), vec3(0.87, 0.88, 0.895), temaT);`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+      roughnessFactor = mix(0.4, 0.62, temaT);`);
   };
   mat.customProgramCacheKey = () => 'tema-plastico';
   mat.needsUpdate = true;
@@ -60,7 +65,11 @@ function tingi(scene: THREE.Object3D, tinte: Record<string, string>): void {
     if (!m.isMesh) return;
     for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
       const c = tinte[mat.name];
-      if (c) (mat as THREE.MeshStandardMaterial).color.set(c);
+      if (!c) continue;
+      const s = mat as THREE.MeshStandardMaterial;
+      s.color.set(c);
+      // I Kenney sono tutti ruvidi al massimo: il tessuto resta opaco, il resto diventa plastica satinata.
+      s.roughness = mat.name.startsWith('carpet') ? 0.85 : mat.name.startsWith('metal') ? 0.42 : 0.55;
     }
   });
 }

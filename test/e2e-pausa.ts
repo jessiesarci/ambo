@@ -1,5 +1,6 @@
-// Prova vera (consuma un po' di quota): interrompe Claude a metà del secondo turno, aggiunge una
-// nota dell'utente, riprende e porta il dibattito fino al documento finale.
+// Prova vera (consuma un po' di quota): interrompe Claude a metà del suo secondo intervento, aggiunge
+// una nota dell'utente, riprende e porta la riunione fino al documento finale. Dopo quattro interventi
+// la chiude l'utente, così la prova resta corta anche senza accordo.
 //   node test/e2e-pausa.ts
 import assert from 'node:assert/strict';
 import { Motore } from '../motore/dibattito.ts';
@@ -8,7 +9,6 @@ import type { Evento } from '../motore/tipi.ts';
 const m = new Motore();
 const d0 = m.crea({
   domanda: 'Per i nomi dei file di un progetto personale meglio kebab-case o snake_case? Rispondete in breve.',
-  maxRound: 2,
   claude: { modello: 'claude-haiku-5-5' },
   codex: { ragionamento: 'low' },
 });
@@ -21,6 +21,7 @@ m.on('evento', (_id: string, e: Evento) => {
   if (e.tipo === 'turno_inizio') console.log(`→ ${e.ruolo} ${e.indice} ${e.agente}`);
   if (e.tipo === 'turno') {
     completati++;
+    if (completati === 4) setImmediate(() => m.concludi(id));
     console.log(`  ✓ ${e.turno.agente}: ${e.turno.risposta.stato} (${e.turno.chiamata.secondi} s, ${e.turno.interventi.length} note)`);
   }
   if (e.tipo === 'avviso' || e.tipo === 'errore') console.log(`  · ${'messaggio' in e ? e.messaggio : e.testo}`);

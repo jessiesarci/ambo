@@ -1,24 +1,89 @@
 {
   "type": "object",
   "properties": {
-    "conclusione": { "type": "string" },
-    "motivazioni": { "type": "array", "items": { "type": "string" } },
-    "decisioni": { "type": "array", "items": { "type": "string" } },
+    "conclusione": {
+      "type": "string"
+    },
+    "motivazioni": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "decisioni": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "disaccordi": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "punto": { "type": "string" },
-          "posizione_claude": { "type": "string" },
-          "posizione_codex": { "type": "string" }
+          "punto": {
+            "type": "string"
+          },
+          "posizione_claude": {
+            "type": "string"
+          },
+          "posizione_codex": {
+            "type": "string"
+          }
         },
-        "required": ["punto", "posizione_claude", "posizione_codex"],
+        "required": [
+          "punto",
+          "posizione_claude",
+          "posizione_codex"
+        ],
         "additionalProperties": false
       }
     },
-    "prossimi_passi": { "type": "array", "items": { "type": "string" } }
+    "prossimi_passi": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "pacchetti": {
+      "type": "array",
+      "description": "I pacchetti di lavoro per la produzione, nell'ordine in cui vanno costruiti; vuoto se non c'è niente da costruire",
+      "items": {
+        "type": "object",
+        "properties": {
+          "titolo": {
+            "type": "string"
+          },
+          "assistente": {
+            "type": "string",
+            "description": "L'id di un assistente del catalogo che lavora in produzione"
+          },
+          "obiettivo": {
+            "type": "string",
+            "description": "Cosa deve consegnare, comprensibile senza leggere la riunione"
+          }
+        },
+        "required": [
+          "titolo",
+          "assistente",
+          "obiettivo"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "procedura": {
+      "type": "string",
+      "description": "L'id della procedura scelta per la produzione, oppure su-misura"
+    }
   },
-  "required": ["conclusione", "motivazioni", "decisioni", "disaccordi", "prossimi_passi"],
+  "required": [
+    "conclusione",
+    "motivazioni",
+    "decisioni",
+    "disaccordi",
+    "prossimi_passi",
+    "pacchetti",
+    "procedura"
+  ],
   "additionalProperties": false
 }

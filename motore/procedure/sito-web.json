@@ -1,0 +1,13 @@
+{
+  "id": "sito-web",
+  "nome": "Sito web",
+  "quando": "pagine, siti, landing, interfacce da vedere nel browser",
+  "passi": [
+    { "assistente": "architettura", "fase": "piano" },
+    { "assistente": "design", "fase": "piano" },
+    { "assistente": "testi", "fase": "produzione" },
+    { "assistente": "design", "fase": "produzione" },
+    { "assistente": "sviluppo", "fase": "produzione" },
+    { "assistente": "controllo", "fase": "collaudo" }
+  ]
+}

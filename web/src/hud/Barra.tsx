@@ -16,15 +16,16 @@ export function Barra({ vista, onIndietro, segui, setSegui, etichetta }: { vista
     return () => clearInterval(t);
   }, [vista.inizioTurno]);
 
-  const round = d ? Math.max(1, Math.ceil((d.turni.length + (vista.parlante && vista.ruolo === 'turno' ? 1 : 0)) / 2)) : 0;
+  // La riunione non ha round: si conta l'intervento in corso (o l'ultimo fatto).
+  const intervento = d ? Math.max(1, d.turni.length + (vista.parlante && vista.ruolo === 'turno' ? 1 : 0)) : 0;
   const statoTesto = !d ? 'Collegamento…'
     : d.esito ? ETICHETTE_ESITO[d.esito]
     : d.stato === 'in_pausa' ? 'In pausa'
     : d.stato === 'errore' ? 'Errore'
     : d.stato === 'sintesi' ? 'Sintesi finale'
-    : `Round ${Math.min(round, d.config.maxRound)} / ${d.config.maxRound}`;
+    : `Riunione · intervento ${intervento}`;
   // Sul telefono la barra è stretta: stato corto e consenso in percentuale.
-  const statoBreve = d && !d.esito && d.stato !== 'in_pausa' && d.stato !== 'errore' && d.stato !== 'sintesi' ? `R ${Math.min(round, d.config.maxRound)}/${d.config.maxRound}` : statoTesto;
+  const statoBreve = d && !d.esito && d.stato !== 'in_pausa' && d.stato !== 'errore' && d.stato !== 'sintesi' ? `I${intervento}` : statoTesto;
   const [domandaAperta, setDomandaAperta] = useState(false);
 
   return (

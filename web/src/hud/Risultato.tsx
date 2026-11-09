@@ -1,9 +1,52 @@
 // Il documento finale, come un foglio appena uscito dalla stampante, con il timbro del revisore.
 import { Play, X } from 'lucide-react';
 import { NOME, altro, type Dibattito } from '../../../motore/tipi.ts';
+import { breve, chiE, conRuolo, incarichiDi, STATO_INCARICO, usaSquadra } from '../squadra.ts';
 import { ETICHETTE_ESITO } from '../stato.ts';
-import { BottoneMarkdown, NomeAgente, PastigliaStato, usaFinestra } from './comuni.tsx';
+import { BottoneMarkdown, NomeAgente, PastigliaStato, quanti, usaFinestra } from './comuni.tsx';
 import { Produzione } from './Produzione.tsx';
+import { TestoBreve } from './Squadra.tsx';
+
+// Il lavoro della squadra nella riunione: gli incarichi con i rapporti accorciati (interi a
+// richiesta), e cosa la sintesi ha deciso per la produzione. I pacchetti eseguiti sono più sotto.
+function LavoroDellaSquadra({ d }: { d: Dibattito }) {
+  const { squadra, procedure } = usaSquadra();
+  const incarichi = incarichiDi(d);
+  const pk = d.sintesi?.testo.pacchetti ?? [];
+  const id = d.sintesi?.testo.procedura;
+  const procedura = id && id !== 'su-misura' ? procedure.find((p) => p.id === id)?.nome ?? id : undefined;
+  if (!incarichi.length && !pk.length && !procedura) return null;
+  return (
+    <>
+      <h3 className="etichetta mt-4">Lavoro della squadra</h3>
+      {incarichi.length > 0 ? (
+        <ul className="mt-1 space-y-2">
+          {incarichi.map((i) => (
+            <li key={i.id} className="rounded-lg bg-cartaScura px-3 py-2 text-[13px]">
+              <div className="flex flex-wrap items-baseline gap-x-1.5">
+                <span className="font-dati text-[11px] text-grafite">{i.id}</span>
+                <span className="font-semibold">{conRuolo(chiE(squadra, i.assistente))}</span>
+                <span className="text-grafite">· chiesto da {NOME[i.da]} · {STATO_INCARICO[i.stato]}{i.xp ? ` · +${i.xp} XP` : ''}</span>
+              </div>
+              <p className="mt-0.5">{breve(i.compito, 220)}</p>
+              {i.rapporto && <TestoBreve testo={i.rapporto} max={320} />}
+              {i.errore && <p className="mt-1 text-[12.5px] text-[#9b2626]">Non consegnato: {i.errore.split('\n')[0]}</p>}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1 text-grafite">Nessun incarico in riunione.</p>
+      )}
+      {(pk.length > 0 || procedura) && (
+        <p className="mt-2 text-[13px]">
+          <span className="etichetta mr-1">Per la produzione</span>
+          {procedura ? `procedura «${procedura}»` : 'su misura'}
+          {pk.length > 0 && `, ${quanti(pk.length, 'pacchetto', 'pacchetti')}: ${pk.map((x) => `${x.titolo} (${chiE(squadra, x.assistente).nome})`).join(', ')}`}
+        </p>
+      )}
+    </>
+  );
+}
 
 export function Risultato({ dibattito: d, onChiudi, onRivedi, cartelle = [], soloLettura = false }: { dibattito: Dibattito; onChiudi: () => void; onRivedi?: () => void; cartelle?: { nome: string; file: number }[]; soloLettura?: boolean }) {
   const s = d.sintesi?.testo;
@@ -94,6 +137,8 @@ export function Risultato({ dibattito: d, onChiudi, onRivedi, cartelle = [], sol
               </ul>
             </>
           )}
+
+          <LavoroDellaSquadra d={d} />
 
           {d.dossier && (
             <p className="mt-4 text-[12.5px] text-grafite">Materiale dato in lettura: {d.dossier.file.length} file della cartella "{d.dossier.cartella}"{d.dossier.rimossi ? `, ${d.dossier.rimossi} possibili segreti cancellati` : ''}.</p>

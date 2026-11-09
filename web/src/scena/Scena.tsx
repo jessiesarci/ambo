@@ -1,53 +1,21 @@
 // La tela 3D: luce, telecamera da diorama, edificio, produzione, omini ed effetti.
-// Ricetta di luce dal consulto con ChatGPT: una direzionale calda che dà la direzione, un HDRI
-// neutro debole per volume e riflessi, poco emisfero e niente luce ambiente che appiattisce.
-import { Environment, PerformanceMonitor } from '@react-three/drei';
+// Luce, basamento e tavolo stanno in Ambiente.tsx; occlusione, bagliore e tone mapping finale in
+// Resa.tsx, solo su computer. Tone mapping Khronos PBR Neutral: tiene il bianco bianco e il lime lime.
+import { PerformanceMonitor } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import type { Agente } from '../../../motore/tipi.ts';
 import type { Azione, Vista } from '../stato.ts';
-import { ContestoSchermi, Direzione, usaSchermi } from './Direzione.tsx';
+import { Basamento, Luci, SFONDO } from './Ambiente.tsx';
+import { ContestoSchermi, Direzione, fuocoSquadra, usaSchermi } from './Direzione.tsx';
 import { Edificio, type ScatolaArchivio } from './Edificio.tsx';
 import { creaRegistro, LivelloEtichette, Proiettore, type DatoEtichetta, type RegistroEtichette } from './Etichette.tsx';
 import { posizioneDi, type Punto } from './pianta.ts';
 import { Produzione } from './Produzione.tsx';
-import { Occlusione } from './Resa.tsx';
+import { Resa } from './Resa.tsx';
 import { Schermo } from './Schermo.tsx';
 import { Telecamera, type Inquadratura } from './Telecamera.tsx';
-
-function Luci({ ridotto }: { ridotto: boolean }) {
-  const sole = useRef<THREE.DirectionalLight>(null!);
-  useEffect(() => {
-    const c = sole.current.shadow.camera;
-    c.left = -30;
-    c.right = 30;
-    c.top = 22;
-    c.bottom = -22;
-    c.near = 1;
-    c.far = 100;
-    c.updateProjectionMatrix();
-    sole.current.target.position.set(0, 0, 0);
-    sole.current.target.updateMatrixWorld();
-  }, []);
-  return (
-    <>
-      <hemisphereLight args={['#ffffff', '#b9bdc3', 0.3]} />
-      <directionalLight
-        ref={sole}
-        position={[-20, 30, 15]}
-        color="#ffffff"
-        intensity={2.3}
-        castShadow
-        shadow-mapSize={ridotto ? [1024, 1024] : [2048, 2048]}
-        shadow-bias={-0.0001}
-        shadow-normalBias={0.02}
-        shadow-radius={2}
-      />
-      <Environment files="/hdri/poly_haven_studio_1k.hdr" environmentIntensity={0.32} />
-    </>
-  );
-}
 
 export interface PropsScena {
   vista: Vista;
@@ -68,13 +36,15 @@ export function Scena(p: PropsScena) {
   const [qualita, setQualita] = useState<'alta' | 'bassa'>(telefono ? 'bassa' : 'alta');
   const ridotto = qualita === 'bassa';
 
-  // Dove guardare: chi sta lavorando, alla scrivania o in sala.
+  // Dove guardare: chi sta lavorando, alla scrivania o in sala. Se non parla un capo reparto e lavora
+  // un assistente, la telecamera va alla sua scrivania.
   const fuoco = useMemo<Punto | null>(() => {
     const a = p.vista.parlante;
-    if (!a) return null;
+    if (!a) return fuocoSquadra(p.vista);
     // Chi lavora sta alla sua scrivania finché non ha finito (vedi Direzione).
     return posizioneDi(a, 'scrivania').punto;
-  }, [p.vista.parlante]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.vista.parlante, p.vista.assistente, p.vista.dibattito]);
 
   // Etichette: il registro collega le ancore 3D ai div; i dati arrivano dalla regia.
   const registro = useMemo(creaRegistro, []);
@@ -95,14 +65,15 @@ export function Scena(p: PropsScena) {
         camera={{ zoom: 20, near: 0.1, far: 220, position: [10, 70, 50] }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         onCreated={({ gl }) => {
-          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMapping = THREE.NeutralToneMapping;
           gl.toneMappingExposure = 1;
         }}
       >
-        <color attach="background" args={['#eceef1']} />
+        <color attach="background" args={[SFONDO]} />
         <PerformanceMonitor onDecline={() => setQualita('bassa')} flipflops={2} />
         <Suspense fallback={null}>
           <Luci ridotto={ridotto} />
+          <Basamento />
           <Telecamera inquadratura={p.inquadratura} fuoco={fuoco} segui={p.segui && !movimentoRidotto} margineSinistro={p.margineSinistro} />
           <Contenuto
             {...p}
@@ -114,7 +85,7 @@ export function Scena(p: PropsScena) {
             onNastro={onNastro}
             nastro={nastro}
           />
-          {!ridotto && <Occlusione />}
+          {!ridotto && <Resa />}
         </Suspense>
         <Proiettore registro={registro} />
       </Canvas>

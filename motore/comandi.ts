@@ -3,6 +3,7 @@
 import { LIMITE_MESSAGGIO, prossimaRisposta } from './chat.ts';
 import { eChat, partitaDaProposta, titoloPartita, type Motore } from './dibattito.ts';
 import { producibile } from './produzione.ts';
+import { incarichiDi } from './prompt.ts';
 import type { ConfigInput, Destinatari, Dibattito } from './tipi.ts';
 
 export const LIMITE_NOTA = 2000;
@@ -38,8 +39,8 @@ export function riassunto(motore: Motore, d: Dibattito) {
     approvata: d.verifica?.testo.approvata ?? null,
     domanda: (chat ? d.config.domanda : titoloPartita(d)).slice(0, 200),
     ...(d.config.daChat ? { daChat: d.config.daChat } : {}),
-    turni: d.turni.length,
-    maxRound: d.config.maxRound,
+    turni: d.turni.length, // gli interventi della riunione
+    incarichi: incarichiDi(d).length,
     claude: d.config.claude.modello,
     codex: d.config.codex.modello ?? null,
     inCorso: attivo(motore, d),

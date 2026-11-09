@@ -6,11 +6,14 @@ import { ErroreAgente } from './processo.ts';
 import type { Agente, RispostaTurno, Sintesi, TipoRisposta, Verifica } from './tipi.ts';
 
 const lista = z.array(z.string());
+// incarichi, pacchetti e procedura hanno un valore di serie: una risposta senza (Claude che li
+// dimentica, o un modello che non li conosce ancora) resta valida. Chi e quanti li decide poi il motore.
 const Dichiarazione = z.object({
   stato: z.enum(['proposta', 'accordo', 'accordo_parziale', 'disaccordo']),
   posizione: z.string(),
   punti_aperti: lista,
   cambi_di_posizione: lista,
+  incarichi: z.array(z.object({ assistente: z.string(), compito: z.string() })).default(() => []),
 });
 const TurnoZ = Dichiarazione.extend({ messaggio: z.string().trim().min(1) });
 const SintesiZ = z.object({
@@ -19,6 +22,8 @@ const SintesiZ = z.object({
   decisioni: lista,
   disaccordi: z.array(z.object({ punto: z.string(), posizione_claude: z.string(), posizione_codex: z.string() })),
   prossimi_passi: lista,
+  pacchetti: z.array(z.object({ titolo: z.string(), assistente: z.string(), obiettivo: z.string() })).default(() => []),
+  procedura: z.string().default('su-misura'),
 });
 const VerificaZ = z.object({
   approvata: z.boolean(),
@@ -74,11 +79,11 @@ function valida<T>(schema: z.ZodType<T>, grezzo: string, prosa?: string): T {
 export function leggiRisposta(tipo: 'turno', agente: Agente, testo: string, prosa?: string): RispostaTurno;
 export function leggiRisposta(tipo: 'sintesi', agente: Agente, testo: string, prosa?: string): Sintesi;
 export function leggiRisposta(tipo: 'verifica', agente: Agente, testo: string, prosa?: string): Verifica;
-export function leggiRisposta(tipo: 'chat', agente: Agente, testo: string, prosa?: string): RispostaChat;
+export function leggiRisposta(tipo: 'chat' | 'incarico', agente: Agente, testo: string, prosa?: string): RispostaChat;
 export function leggiRisposta(tipo: TipoRisposta, agente: Agente, testo: string, prosa?: string): RispostaTurno | Sintesi | Verifica | RispostaChat;
 export function leggiRisposta(tipo: TipoRisposta, agente: Agente, testo: string, prosa?: string): RispostaTurno | Sintesi | Verifica | RispostaChat {
-  // In chat si risponde in testo libero, senza blocchi né schema.
-  if (tipo === 'chat') {
+  // In chat e nei rapporti della squadra si risponde in testo libero, senza blocchi né schema.
+  if (tipo === 'chat' || tipo === 'incarico') {
     const messaggio = testo.trim();
     if (!messaggio) throw new ErroreFormato('risposta vuota');
     return { messaggio };

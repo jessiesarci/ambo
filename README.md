@@ -1,6 +1,6 @@
 # Ambo
 
-**English summary.** Ambo is a local web app that lets you chat with Claude Code and Codex at the same time, on your own computer, using the official CLIs and your own subscriptions (no API keys by default). The two agents can also work in turns on a goal and, if you want, write files in an isolated folder and review each other's work. The interface and the documentation are in Italian.
+**English summary.** Ambo is a local web app that lets you chat with Claude Code and Codex at the same time, on your own computer, using the official CLIs and your own subscriptions (no API keys by default). The two agents can also plan a goal together in a meeting, hand tasks to a team of assistants chosen for the kind of work, and, if you want, have files written in an isolated folder, one work package after the other, and then reviewed. The interface and the documentation are in Italian.
 
 *Ambo*, in latino: tutti e due.
 
@@ -10,9 +10,11 @@ Ambo è un programma che gira sul tuo PC e si usa dal browser. Ti fa chattare co
 
 - **Chat.** Scrivi un messaggio e rispondono tutti e due, uno dopo l'altro. Il secondo legge la risposta del primo e aggiunge solo quello che manca, oppure dice che non ha niente da aggiungere.
 - **Scheda compito.** Quando una cosa va fatta, un agente propone una scheda con il tasto **Avvia**.
-- **Partita.** I due agenti lavorano a turni su un obiettivo, per un numero massimo di round. Alla fine uno scrive la sintesi e l'altro la verifica. Ottieni un documento in markdown.
-- **Produzione.** Claude scrive i file in una cartella separata (il cantiere), Codex li controlla (il collaudo). Se il collaudo non passa, Claude corregge.
-- **Ufficio 3D.** Una scena con gli omini degli agenti: vedi chi pensa, chi cerca nelle note, chi scrive.
+- **Riunione.** In una partita Claude e Codex fanno da capi reparto: parlano a turno e preparano insieme il piano, finché tutti e due lo sottoscrivono. Alla fine uno scrive la sintesi e l'altro la verifica. Ottieni un documento in markdown.
+- **Squadra.** Durante la riunione i capi possono affidare incarichi agli assistenti, scelti per il tipo di lavoro: 7 di serie (ricerca, analisi, architettura, testi, design, sviluppo, controllo qualità) e, se lo chiedi, i tuoi agenti di Claude Code. Ogni assistente ha le sue skill, un livello da 1 a 10 e i punti esperienza (XP) che guadagna lavorando.
+- **Procedure.** Modi di lavorare già pronti (sito web, documento, analisi, codice, su misura) che dicono quale assistente fa cosa nel piano, nella produzione e nel collaudo. Puoi aggiungere le tue.
+- **Produzione.** La decisione diventa file in una cartella separata (il cantiere), come una catena di montaggio: gli assistenti costruiscono i pacchetti di lavoro uno dopo l'altro, Codex fa il collaudo e gli eventuali passi di collaudo della procedura rivedono i file. Se il collaudo non passa, si corregge.
+- **Ufficio 3D.** Una scena con gli omini dei capi reparto e degli assistenti: vedi chi pensa, chi cerca nelle note, chi scrive, chi lavora a un incarico.
 - **Voce** (facoltativa). Detti i messaggi; la trascrizione può restare sul PC.
 
 Il programma non ha una parte online, non ha account suoi e non raccoglie dati di uso. Il server ascolta solo sul tuo PC (127.0.0.1).
@@ -291,7 +293,8 @@ La configurazione sta nel file `.env` nella cartella del programma. Copialo da [
 | `AMBO_PROFILO` | Percorso del tuo profilo | `profilo.md` nella cartella del programma |
 | `AMBO_NOTE` | Una cartella di note markdown da dare in lettura agli agenti (per esempio un vault Obsidian) | nessuna |
 | `AMBO_SALVA_IN` | Dove il programma salva decisioni e chat come note markdown | `dati/note` |
-| `AMBO_AMBIENTE` | Con `1` Claude parte con le tue impostazioni utente di Claude Code (il tuo CLAUDE.md, i plugin, le skill) e gli agenti possono leggere le tue skill | spento: Claude parte vuoto |
+| `AMBO_AMBIENTE` | Con `1` Claude parte con le tue impostazioni utente di Claude Code (il tuo CLAUDE.md, i plugin, le skill), gli agenti possono leggere le tue skill e i tuoi agenti di Claude Code (`~/.claude/agents/*.md`) entrano nella squadra | spento: Claude parte vuoto, squadra solo con i 7 assistenti di serie |
+| `AMBO_AGENTI` | Solo con `AMBO_AMBIENTE=1`: la cartella da cui prendere gli agenti della squadra, oppure `0` per non prenderne nessuno | `~/.claude/agents` |
 | `AMBO_CONSENTI_API` | Con `1` accetta anche il login con chiave API (fatturazione a consumo), per Claude Code e per Codex. Non permette i crediti extra di Claude: quelli il programma li ferma sempre | spento |
 | `AMBO_PORTA` | Porta del server | `4317` |
 | `AMBO_DATI` | Cartella dei dati. Non metterla dentro `AppData` su Windows: lì Claude non può scrivere e la produzione si ferma con un messaggio (vale anche se tutto il programma sta dentro `AppData`) | `./dati` |
@@ -305,6 +308,25 @@ La configurazione sta nel file `.env` nella cartella del programma. Copialo da [
 | `AMBO_PAROLE_VIETATE` | Solo per `npm run controllo`: parole personali da cercare nei file prima di pubblicare (il tuo nome, i tuoi clienti), separate da virgole. Si può mettere nel `.env` | nessuna |
 
 Il **profilo** è un file markdown in cui scrivi chi sei e come lavori. Parti da [`profilo.esempio.md`](profilo.esempio.md). Gli agenti lo leggono in sola lettura.
+
+**Procedure tue.** Oltre a quelle di serie (in `motore/procedure/`) puoi scriverne di tue, un file JSON ciascuna, in `dati/procedure/` (o nella sottocartella `procedure` di `AMBO_DATI`). Il formato:
+
+```json
+{
+  "id": "volantino",
+  "nome": "Volantino",
+  "quando": "volantini e locandine da stampare",
+  "passi": [
+    { "assistente": "testi", "fase": "piano" },
+    { "assistente": "design", "fase": "produzione" },
+    { "assistente": "controllo", "fase": "collaudo" }
+  ]
+}
+```
+
+La `fase` è `piano` (un incarico in riunione), `produzione` (un pacchetto nel cantiere) o `collaudo` (una revisione dei file in sola lettura, dopo quella di Codex). L'`assistente` è un id della squadra. Una procedura con lo stesso `id` di una di serie la sostituisce. I passi con un assistente che non c'è si tolgono.
+
+**Agenti tuoi nella squadra.** Con `AMBO_AMBIENTE=1` ogni file `.md` in `~/.claude/agents` diventa un assistente: l'id è il campo `name` (o il nome del file), il ruolo la prima frase di `description`, le istruzioni il resto del file. Lavora con Claude. Può costruire pacchetti in produzione solo se il suo campo `tools` contiene `Write` o `Edit`. Gli strumenti però non li decide quel campo: un tuo agente ha sempre e solo gli strumenti degli altri assistenti (sola lettura in riunione, solo il cantiere in produzione). Se ha lo stesso id di un assistente di serie, prende il suo posto.
 
 Dopo una modifica al file `.env`, riavvia il programma.
 
@@ -333,33 +355,55 @@ Quando dalla chat viene fuori una cosa da fare, l'agente propone una **scheda co
 
 Se la scheda dice **"piano, poi produzione"** e la partita finisce con l'accordo pieno, la produzione parte da sola. Senza accordo pieno la produzione non parte da sola: decidi tu.
 
-### Partite
+### Partite: la riunione
 
-In una partita i due agenti lavorano a turni su un obiettivo.
+Una partita è una riunione di pianificazione. Claude e Codex sono i due capi reparto: parlano a turno, un intervento ciascuno, e costruiscono il piano per il tuo obiettivo. Non c'è un numero fisso di interventi da scegliere.
 
 - Modo **insieme** (di serie): costruiscono la soluzione insieme.
 - Modo **confronto**: valutano le alternative in modo critico.
-- Round: da 1 a 10, di serie 3. In ogni round parla una volta ciascuno.
-- **Ricerca web**: facoltativa, si accende per la singola partita quando la crei. Claude e Codex possono cercare sul web; tutti gli altri strumenti restano spenti.
+- **Ricerca web**: facoltativa, si accende per la singola partita quando la crei. Claude, Codex e gli assistenti possono cercare sul web; tutti gli altri strumenti restano spenti.
 
-La partita finisce quando i due dichiarano l'accordo pieno uno dopo l'altro, quando sono in stallo, o quando finiscono i round. Poi uno scrive la sintesi e l'altro la verifica. Il risultato è un documento in markdown, che puoi scaricare. A fine partita la decisione si salva anche come nota, nella cartella `Decisioni` dentro `AMBO_SALVA_IN`.
+La riunione finisce quando i due dichiarano l'accordo pieno uno dopo l'altro, quando sono in stallo (solo nel modo confronto), oppure al limite di sicurezza di 16 interventi, che serve a non consumare la quota se l'accordo non arriva. Poi uno scrive la sintesi e l'altro la verifica. Il risultato è un documento in markdown, che puoi scaricare. A fine partita la decisione si salva anche come nota, nella cartella `Decisioni` dentro `AMBO_SALVA_IN`.
 
-Mentre la partita gira puoi:
+Mentre la riunione gira puoi:
 
-- **Pausa** e **Riprendi**: la fermi (il turno in corso si interrompe) e la fai ripartire da quel turno;
-- **Concludi**: chiudi senza aspettare l'accordo e passi subito alla sintesi. L'esito resta "chiusa dall'utente": non viene registrato come accordo;
-- **Nota del moderatore**: scrivi un'indicazione. Arriva a tutti e due, a ciascuno al suo turno successivo, e ha la precedenza sul resto.
+- **Pausa** e **Riprendi**: la fermi (l'intervento o l'incarico in corso si interrompe) e la fai ripartire da lì;
+- **Concludi**: chiudi senza aspettare l'accordo e passi subito alla sintesi. Gli incarichi non ancora partiti si annullano. L'esito resta "chiusa dall'utente": non viene registrato come accordo;
+- **Nota del moderatore**: scrivi un'indicazione. Arriva a tutti e due, a ciascuno al suo intervento successivo, e ha la precedenza sul resto.
 
 Le regole precise sono in [docs/COME-FUNZIONA.md](docs/COME-FUNZIONA.md).
 
+### La squadra
+
+Durante la riunione un capo reparto può affidare un incarico a un assistente: un fatto da verificare, un conto, una bozza, un controllo del piano. Il motore lo esegue dopo il suo intervento, e il rapporto arriva a chi parla dopo.
+
+| Assistente | Ruolo | Lavora con | In produzione |
+|---|---|---|---|
+| Rita | Ricerca | Claude | no |
+| Marco | Analisi | Codex | no |
+| Elena | Architettura | Claude | no |
+| Luca | Testi | Claude | sì |
+| Sara | Design | Claude | sì |
+| Paolo | Sviluppo | Claude | sì |
+| Nadia | Controllo qualità | Codex | no |
+
+Con `AMBO_AMBIENTE=1` si aggiungono i tuoi agenti di Claude Code (vedi [Configurazione](#configurazione)).
+
+- Ogni assistente lavora da solo, in una sessione nuova, con le stesse regole dei capi reparto: sola lettura, note e ricerca web solo se sono accese. Non vede la riunione: riceve l'obiettivo, il compito e l'eventuale materiale.
+- Al massimo 2 incarichi per intervento e 8 per riunione. Gli incarichi oltre il limite, o per un assistente che non c'è, si scartano e la riunione lo dice.
+- Se un incarico non riesce, la riunione va avanti e i capi ricevono l'errore al posto del rapporto. Si ferma tutto solo per i controlli di sicurezza (chiave API, crediti extra, strumento non ammesso).
+- **Esperienza e livelli.** Un rapporto consegnato o una revisione fatta vale 20 XP, un pacchetto di produzione fatto 30, un collaudo superato altri 20 a ogni assistente che ha costruito un pacchetto. Un incarico fallito non dà XP. I livelli vanno da 1 a 10. Il pannello **Squadra** nella pagina Partite mostra tutti gli assistenti con livello, barra dell'XP e quante volte sono stati chiamati; un tocco apre la scheda con le skill e le statistiche (chiamato, completati, falliti, pacchetti, collaudi superati, riuscita). I numeri stanno in `dati/squadra.json`.
+
+Nella sintesi i capi scelgono anche la **procedura** e dividono il lavoro per la produzione in **pacchetti** (al massimo 5), ognuno con il suo assistente.
+
 ### Produzione
 
-La produzione trasforma la decisione di una partita in file.
+La produzione trasforma la decisione di una partita in file, come una catena di montaggio.
 
 1. Il programma crea il **cantiere**: una cartella nuova in `dati/cantieri/<id>`, vuota o con la copia ripulita di una cartella autorizzata.
-2. Claude scrive i file nel cantiere. Non può eseguire comandi, non usa il web e non può uscire dalla cartella.
-3. Codex fa il **collaudo**: legge i file e dice se il lavoro regge.
-4. Se il collaudo respinge il lavoro, Claude corregge e Codex ricontrolla, al massimo due volte.
+2. Gli assistenti di produzione costruiscono i **pacchetti** decisi nella sintesi, uno dopo l'altro, nello stesso cantiere: ognuno vede i file dei precedenti. Lavorano tutti con Claude. Senza pacchetti si seguono i passi di produzione della procedura; senza neanche quelli, costruisce tutto Paolo (sviluppo). Non possono eseguire comandi, non usano il web e non possono uscire dalla cartella.
+3. Codex fa il **collaudo**: legge i file e dice se il lavoro regge. Se la procedura ha passi di collaudo, dopo Codex i loro assistenti rivedono i file, in sola lettura. Il collaudo passa solo se lo approvano tutti quelli che hanno risposto.
+4. Se il collaudo respinge il lavoro, corregge l'assistente dei file citati nei problemi e si ricontrolla, al massimo due volte.
 
 I file restano nel cantiere: li copi tu dove servono. Il programma non tocca mai la cartella originale.
 
@@ -373,6 +417,8 @@ Nell'ufficio 3D gli omini mostrano cosa stanno facendo gli agenti: pensano, cerc
 - cosa ha usato (note lette, ricerche);
 - le skill in uso, solo se la CLI lo conferma;
 - le skill a disposizione.
+
+Gli assistenti chiamati nella partita aperta siedono alle 7 scrivanie della parete nord, nell'ordine in cui sono stati chiamati (se sono di più, compaiono solo nei pannelli; sul telefono se ne vedono al massimo tre). Il loro cartellino porta il nome, il livello ("Lv") e la barra dell'XP; mentre lavorano hanno il fumetto "Al lavoro". Un tocco apre la loro scheda: ruolo, livello, skill, statistiche, cosa stanno facendo e gli incarichi della partita.
 
 Il pannello **Lavori** mostra cosa è al lavoro adesso e cosa aspetta una tua decisione.
 
@@ -411,10 +457,10 @@ Attenzione: quello che gli agenti leggono (note, profilo, copie delle cartelle) 
 Una partita si può lanciare anche senza dashboard:
 
 ```bash
-npm run dibattito -- --round 3 "la tua domanda"
+npm run dibattito -- "la tua domanda"
 ```
 
-che equivale a `node --env-file-if-exists=.env motore/cli.ts --round 3 "la tua domanda"`. Senza `--env-file-if-exists=.env` il programma non legge il `.env`: con `AMBO_DATI` impostata, la partita finirebbe in un'altra cartella e la dashboard non la vedrebbe.
+che equivale a `node --env-file-if-exists=.env motore/cli.ts "la tua domanda"`. Senza `--env-file-if-exists=.env` il programma non legge il `.env`: con `AMBO_DATI` impostata, la partita finirebbe in un'altra cartella e la dashboard non la vedrebbe.
 
 ### Comandi npm
 
@@ -439,7 +485,8 @@ Il programma è gratuito (licenza MIT). Gli abbonamenti no: ti servono un piano 
 Ogni uso consuma la quota dei tuoi abbonamenti:
 
 - un messaggio in chat costa una o due chiamate alle CLI;
-- una partita da 3 round con sintesi e verifica è nell'ordine di 300-400 mila token in ingresso in tutto;
+- una riunione di 6 interventi con sintesi e verifica (8 chiamate) è nell'ordine di 300-400 mila token in ingresso in tutto;
+- ogni incarico alla squadra è una chiamata in più, ogni pacchetto e ogni revisione della produzione anche;
 - la produzione costa di più.
 
 I token si vedono sotto ogni risposta e nel documento finale. Numeri ed esempi: [docs/REQUISITI-E-COSTI.md](docs/REQUISITI-E-COSTI.md).
@@ -448,9 +495,10 @@ I token si vedono sotto ogni risposta e nel documento finale. Numeri ed esempi: 
 
 - Il server ascolta solo su 127.0.0.1 e controlla le intestazioni Host e Origin, contro DNS rebinding e CSRF.
 - In chat e in partita gli agenti non hanno strumenti che scrivono file o eseguono comandi. Se una CLI prova a usare uno strumento non ammesso, il motore ferma il turno.
+- Gli assistenti della squadra li lancia il motore, uno alla volta, con gli stessi strumenti e controlli dei capi reparto. Anche i tuoi agenti di Claude Code danno solo istruzioni: gli strumenti li decide il motore. Incarichi, pacchetti e revisioni hanno un numero massimo.
 - La ricerca web è spenta di serie e si accende solo per la singola partita. È l'unico accesso alla rete che gli agenti hanno, oltre al loro servizio.
 - Il motore toglie le chiavi API dall'ambiente delle CLI. Di serie si ferma se una CLI usa una chiave API; si ferma sempre se Claude passa ai crediti extra.
-- In produzione Claude scrive solo nel cantiere: lo impongono le regole dei permessi di Claude Code e il motore ferma il lavoro se vede una scrittura fuori.
+- In produzione gli assistenti scrivono solo nel cantiere: lo impongono le regole dei permessi di Claude Code e il motore ferma il lavoro se vede una scrittura fuori.
 - Note e cartelle sono trattate come dati, non come istruzioni.
 
 Non è una sandbox del sistema operativo: si appoggia ai sistemi di permessi delle CLI. Dettagli in [SECURITY.md](SECURITY.md).
@@ -458,7 +506,8 @@ Non è una sandbox del sistema operativo: si appoggia ai sistemi di permessi del
 ## Limiti noti
 
 - Non è una sandbox del sistema operativo. La protezione dipende dai permessi di Claude Code e dalla sandbox di Codex, più i controlli del motore.
-- Il consumo della quota dei tuoi abbonamenti è reale. Le partite e la produzione ne usano parecchia.
+- Il consumo della quota dei tuoi abbonamenti è reale. Le partite e la produzione ne usano parecchia, e ogni incarico, pacchetto o revisione è una chiamata in più.
+- Gli assistenti non sono sub-agenti delle CLI: li lancia il motore uno alla volta, quindi una riunione con molti incarichi dura di più.
 - Le risposte degli agenti possono essere sbagliate, anche quando sono d'accordo tra loro e anche dopo il collaudo.
 - La produzione non esegue comandi: non installa dipendenze, non compila, non lancia test. Il collaudo è una lettura dei file.
 - Il programma dipende dalle opzioni e dal formato di uscita delle CLI. Un aggiornamento di Claude Code o di Codex può cambiare qualcosa: in quel caso il programma di solito si ferma con un errore invece di andare avanti senza controlli.

@@ -4,7 +4,7 @@ Istruzioni per gli assistenti AI (Claude Code, Codex e altri) che lavorano in qu
 
 ## Cos'è
 
-Ambo è un programma locale: chat con Claude Code e Codex insieme, partite a turni su un obiettivo, produzione di file in una cartella recintata (il cantiere) con collaudo. Usa le CLI ufficiali con il login e l'abbonamento di chi lo usa. Il server ascolta solo su 127.0.0.1. Non c'è una parte online, non ci sono account del programma, non c'è telemetria.
+Ambo è un programma locale: chat con Claude Code e Codex insieme, riunioni di pianificazione su un obiettivo con una squadra di assistenti, produzione di file in una cartella recintata (il cantiere), a pacchetti, con collaudo. Usa le CLI ufficiali con il login e l'abbonamento di chi lo usa. Il server ascolta solo su 127.0.0.1. Non c'è una parte online, non ci sono account del programma, non c'è telemetria.
 
 Il funzionamento è descritto in [docs/COME-FUNZIONA.md](docs/COME-FUNZIONA.md). Il modello di sicurezza in [SECURITY.md](SECURITY.md).
 
@@ -49,7 +49,8 @@ Non rendere più ampio quello che gli agenti del programma possono fare. In part
 - le cartelle del cantiere (le regole `Read`/`Edit` limitate alla cartella, i divieti sulle cartelle delle CLI e delle chiavi SSH);
 - la sandbox di Codex (`read-only`, gli strumenti spenti con `--disable`, `--ignore-user-config`, `--strict-config`);
 - cosa può leggere il server delle note (solo file `.md` nelle fonti scelte, niente collegamenti, niente scrittura, niente rete);
-- quali cartelle si possono autorizzare.
+- quali cartelle si possono autorizzare;
+- gli strumenti degli assistenti della squadra: sono quelli dei capi reparto (sola lettura in riunione e nelle revisioni, solo il cantiere in produzione). Gli agenti dell'utente (`~/.claude/agents`) entrano solo con `AMBO_AMBIENTE=1` e danno solo istruzioni: il loro campo `tools` non diventa mai un permesso, e `Agent`/`Task` restano vietati.
 
 Se una funzione nuova sembra richiedere più permessi, proponila all'utente spiegando cosa cambia e quali rischi porta, e aspetta un sì esplicito.
 
@@ -65,7 +66,8 @@ Non togliere, aggirare o indebolire questi controlli, neanche "per provare" o pe
 - l'arresto del turno quando una CLI usa uno strumento o un server non ammesso;
 - il filtro dei segreti (file di credenziali esclusi, righe che sembrano segreti cancellate);
 - il recinto del cantiere (arresto se c'è una scrittura fuori, controllo della memoria automatica di Claude Code);
-- i delimitatori casuali e la neutralizzazione delle righe che imitano i messaggi del motore;
+- i delimitatori casuali e la neutralizzazione delle righe che imitano i messaggi del motore (anche per i compiti e i rapporti della squadra e per i file nelle revisioni);
+- i tetti interni: interventi per riunione, incarichi per intervento e per riunione, pacchetti per produzione, correzioni;
 - la CSP della dashboard e le altre intestazioni di sicurezza.
 
 Se un controllo blocca qualcosa di legittimo, segnala il caso all'utente invece di spegnerlo.
@@ -118,10 +120,12 @@ L'indirizzo esatto lo trovi su GitHub, in Settings, Emails (con "Keep my email a
 ```
 motore/            il motore Node: server, chat, partite, produzione
   server.ts        server HTTP su 127.0.0.1 (API, eventi in tempo reale, file della dashboard)
-  dibattito.ts     il Motore: chat, partite, sintesi e verifica, avvio della produzione
+  dibattito.ts     il Motore: chat, riunioni, incarichi della squadra, sintesi e verifica, avvio della produzione
   chat.ts          regole della chat (chi risponde, PASSO, schede compito)
-  prompt.ts        i messaggi per gli agenti nelle partite
-  produzione.ts    cantiere, collaudo, correzioni
+  prompt.ts        i messaggi per i capi reparto e per gli assistenti nelle riunioni
+  squadra.ts       catalogo degli assistenti (di serie e dell'utente), procedure, XP e livelli, tetti
+  produzione.ts    cantiere, pacchetti, collaudo, revisioni, correzioni
+  procedure/       procedure di serie (JSON): sito web, documento, analisi, codice, su misura
   agenti/          come si lanciano le CLI: claude.ts, codex.ts, cantiere.ts
   processo.ts      avvio dei processi e pulizia dell'ambiente
   ambiente.ts      dove sono le CLI, controllo del login (e permesso delle chiavi API), cartella dei dati, cartelle delle CLI
@@ -129,7 +133,8 @@ motore/            il motore Node: server, chat, partite, produzione
   cartelle.ts      cartelle autorizzate, copie filtrate, filtro dei segreti
   memoria-mcp.ts   server MCP delle note, in sola lettura
   voce.ts, voce/   trascrizione vocale locale (Python, faster-whisper)
-  istruzioni/      istruzioni di sistema per gli agenti
+  istruzioni/      istruzioni di sistema per gli agenti (capi reparto, chat, assistenti, cantiere, collaudo)
+    squadra/       il ruolo di ognuno dei 7 assistenti di serie
   schemi/          schemi JSON delle risposte (turno, sintesi, verifica, collaudo)
   cli.ts           partita da terminale
 web/               dashboard React + Three (Vite, Tailwind)
@@ -141,10 +146,10 @@ web/               dashboard React + Three (Vite, Tailwind)
 test/              test con node:test
 strumenti/         script di servizio
 docs/              documentazione
-dati/              creata all'avvio, fuori dal repository: chat, partite, cantieri, note salvate
+dati/              creata all'avvio, fuori dal repository: chat, partite, cantieri, note salvate, squadra.json, procedure dell'utente
 ```
 
-I nomi dei singoli file possono cambiare: in caso di dubbio cerca nel codice. Le variabili `AMBO_*` non si leggono tutte in `impostazioni.ts`: `AMBO_DATI` e `AMBO_CONSENTI_API` stanno in `ambiente.ts` (e i controlli sulle chiavi API usano quella copia), `AMBO_PORTA` in `server.ts`, quelle della voce in `voce.ts`, `AMBO_PAROLE_VIETATE` in `strumenti/controllo-sterile.ts`.
+I nomi dei singoli file possono cambiare: in caso di dubbio cerca nel codice. Le variabili `AMBO_*` non si leggono tutte in `impostazioni.ts`: `AMBO_DATI` e `AMBO_CONSENTI_API` stanno in `ambiente.ts` (e i controlli sulle chiavi API usano quella copia), `AMBO_PORTA` in `server.ts`, quelle della voce in `voce.ts`, `AMBO_AGENTI` in `squadra.ts`, `AMBO_MOTORE` (solo sviluppo, il motore a cui il server di Vite passa `/api`, solo indirizzi locali) in `web/vite.config.ts`, `AMBO_PAROLE_VIETATE` in `strumenti/controllo-sterile.ts`.
 
 ## Comandi
 
@@ -155,7 +160,7 @@ I nomi dei singoli file possono cambiare: in caso di dubbio cerca nel codice. Le
 | `npm start` | Avvia il programma su http://127.0.0.1:4317 |
 | `npm run server:dev` | Motore in sviluppo (accetta anche il server di Vite) |
 | `npm run web` | Dashboard in sviluppo con Vite |
-| `npm run dibattito -- --round 3 "domanda"` | Partita da terminale (consuma quota) |
+| `npm run dibattito -- "domanda"` | Riunione da terminale (consuma quota) |
 | `npm test` | Test, senza CLI vere |
 | `npm run typecheck` | Controllo dei tipi del motore e della dashboard |
 | `npm run controllo` | Cerca dati personali, percorsi, chiavi e segreti nei file del repository |
