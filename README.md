@@ -90,7 +90,7 @@ Apri **PowerShell** (non serve come amministratore).
 5. Scarica Contrappunto (lo zip da GitHub, poi estrailo, oppure con git) ed entra nella cartella:
 
    ```powershell
-   git clone <indirizzo del repository> contrappunto
+   git clone https://github.com/jessiesarci/contrappunto.git
    cd contrappunto
    ```
 
@@ -146,7 +146,7 @@ Apri il **Terminale**.
 4. Scarica Contrappunto ed entra nella cartella:
 
    ```bash
-   git clone <indirizzo del repository> contrappunto
+   git clone https://github.com/jessiesarci/contrappunto.git
    cd contrappunto
    ```
 
@@ -200,7 +200,7 @@ Apri un terminale. Gli esempi sono per Debian e Ubuntu; sulle altre distribuzion
 4. Scarica Contrappunto ed entra nella cartella:
 
    ```bash
-   git clone <indirizzo del repository> contrappunto
+   git clone https://github.com/jessiesarci/contrappunto.git
    cd contrappunto
    ```
 
