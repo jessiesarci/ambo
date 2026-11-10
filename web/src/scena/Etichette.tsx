@@ -4,6 +4,8 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useMemo } from 'react';
 import * as THREE from 'three';
+import { coloreAgente } from '../avatar.ts';
+import { Avatar } from '../hud/Avatar.tsx';
 import { usaSquadra } from '../squadra.ts';
 import { Fumetto, Puntini, Targhetta, type TonoFumetto } from './Fumetti.tsx';
 
@@ -88,7 +90,8 @@ export function LivelloEtichette({ dati, registro, onAgente }: { dati: DatoEtich
             const targhetta = (
               <Targhetta
                 nome={d.nome ?? ''}
-                colore={d.colore ?? '#888'}
+                colore={d.assistente ? coloreAgente(d.assistente) : d.colore ?? '#888'}
+                avatar={d.assistente ? <Avatar id={d.assistente} dimensione={18} tondo /> : undefined}
                 livello={d.livello}
                 xp={d.xp}
                 sotto={

@@ -2,6 +2,21 @@
 
 Le versioni seguono il numero in `package.json` e i tag su GitHub (`vX.Y.Z`).
 
+## 0.3.0 · 10 novembre 2026
+
+Squadra con meno testo e più gioco, ufficio diviso in reparti, catena di montaggio che segue il lavoro vero.
+
+- **Pannello Squadra più compatto.** Carte piccole con avatar, nome, livello, barra dell'XP e gli ultimi badge presi, senza descrizioni. In cima il podio dei tre con più XP. L'ordine si sceglie: esperienza, chiamate o riuscita.
+- **Avatar.** Ogni assistente ha un suo ritratto, sempre uguale, con un colore che ritrovi sul suo omino e sul cartellino nell'ufficio. Anche i tuoi agenti di Claude Code ne hanno uno.
+- **Titoli e badge.** Ogni due livelli un titolo: Apprendista, Operativo, Esperto, Veterano, Leggenda. I badge sono traguardi presi dalle statistiche (prima consegna, 10 e 25 rapporti, collaudi superati, affidabile, instancabile, livello 5, il più chiamato). Quelli che mancano si vedono spenti, con la regola per prenderli.
+- **Scheda completa.** Un tocco su una carta, su un cartellino o su una riga del registro apre tutta la scheda: descrizione intera, titolo, XP che mancano al livello dopo, tutti i badge, competenze, statistiche e ultimi lavori con l'esito. Sul telefono prende tutto lo schermo.
+- **Ufficio a reparti.** Direzione, Ricerca e analisi, Progettazione, Contenuti, Sviluppo, Qualità e una zona per gli ospiti, ognuno con il suo cartello a terra. Ogni assistente siede nel reparto del suo ruolo; i tuoi agenti in quello più vicino, oppure tra gli ospiti. Claude e Codex vanno in sala riunioni solo durante la riunione, poi tornano alle loro scrivanie in Direzione, dove una lavagna mostra il piano della partita aperta.
+- **Arredo al suo posto.** Sedie, monitor, divani e poltrone sono girati dalla parte giusta. Ci sono piante, gli schermi di chi lavora sono accesi e il reparto attivo è segnato a terra.
+- **Catena di montaggio fedele.** Cinque stazioni: Piano, Costruzione (una postazione per pacchetto, con chi lo costruisce), Collaudo, Correzioni (solo se servono) e Consegna. La scatola del lavoro sta alla stazione dove la produzione è davvero.
+- **Chat più pulita.** I lavori stanno in una riga sola ("2 da decidere · 1 al lavoro") che si apre con un tocco. Tempi e token sotto le risposte si vedono toccando la risposta, oppure sempre, dal menu. Dei messaggi del motore si vede la prima frase; il resto con un tocco.
+- **Niente sovrapposizioni.** Sul computer e sul telefono pannelli, schede e registro non si coprono più. L'avviso del server sta sotto la testata, non sopra il modulo.
+- **Grafica ridotta più leggera.** Sul telefono, o quando il PC rallenta, si animano al massimo 4 assistenti e la scheda video lavora meno. Se il browser perde la grafica 3D, la scena riparte da sola in modalità ridotta.
+
 ## 0.2.0 · 9 novembre 2026
 
 La partita diventa una riunione, con una squadra di assistenti.

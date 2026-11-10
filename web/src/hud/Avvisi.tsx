@@ -6,7 +6,7 @@ import type { Info } from '../api.ts';
 import { alLavoro, chiE, usaSquadra } from '../squadra.ts';
 import { suona } from '../suoni.ts';
 import { ETICHETTE_ESITO, type Azione, type Vista } from '../stato.ts';
-import { NomeAgente, PastigliaStato } from './comuni.tsx';
+import { NomeAgente, PastigliaStato, usaFinestra } from './comuni.tsx';
 import { SchedaAssistente } from './Squadra.tsx';
 
 export interface AvvisoExtra {
@@ -150,10 +150,11 @@ function SkillAgente({ usate, disponibili }: { usate: string[]; disponibili?: Sk
 // La scheda di chi è stato toccato in scena o nei pannelli: un capo reparto o un assistente.
 export type SchedaAperta = { tipo: 'agente'; agente: Agente } | { tipo: 'assistente'; id: string };
 
-export function Scheda({ scheda, vista, info, onChiudi }: { scheda: SchedaAperta; vista: Vista; info?: Info; onChiudi: () => void }) {
+// className va solo alla scheda di un assistente (dimensioni decise da chi la contiene).
+export function Scheda({ scheda, vista, info, onChiudi, className }: { scheda: SchedaAperta; vista: Vista; info?: Info; onChiudi: () => void; className?: string }) {
   return scheda.tipo === 'agente'
     ? <SchedaAgente agente={scheda.agente} vista={vista} onChiudi={onChiudi} skill={info?.skill?.[scheda.agente]} />
-    : <SchedaAssistente id={scheda.id} vista={vista} onChiudi={onChiudi} />;
+    : <SchedaAssistente id={scheda.id} vista={vista} onChiudi={onChiudi} className={className} />;
 }
 
 export function SchedaAgente({ agente, vista, onChiudi, skill }: { agente: Agente; vista: Vista; onChiudi: () => void; skill?: SkillPc[] }) {
@@ -169,6 +170,8 @@ export function SchedaAgente({ agente, vista, onChiudi, skill }: { agente: Agent
     ...vista.diario.filter((v) => v.agente === agente && v.strumento).map((v) => v.testo),
   ])];
   const usate = fatte.filter((x) => x.startsWith('Usa la skill'));
+  // Esc (solo se nessuna finestra sopra l'ha già usato) e il focus che torna a chi l'ha aperta.
+  usaFinestra(onChiudi, false);
   return (
     <div className="pannello pointer-events-auto scorri max-h-[70dvh] w-full max-w-sm animate-[comparsa_.2s_ease-out] overflow-y-auto p-3" role="dialog" aria-label={`Scheda di ${NOME[agente]}`}>
       <div className="flex items-center gap-2">

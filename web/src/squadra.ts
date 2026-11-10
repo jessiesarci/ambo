@@ -143,6 +143,36 @@ export function perEsperienza(squadra: readonly MembroSquadra[]): MembroSquadra[
   return [...squadra].sort((a, b) => b.statistiche.xp - a.statistiche.xp || b.statistiche.incarichi - a.statistiche.incarichi);
 }
 
+// --- ordinamenti, podio, titoli e badge -----------------------------------------------------
+
+export type Ordine = 'esperienza' | 'chiamate' | 'riuscita';
+export const ORDINI: Record<Ordine, string> = { esperienza: 'Esperienza', chiamate: 'Chiamate', riuscita: 'Riuscita' };
+
+// A pari valore decide l'esperienza; chi non ha mai finito un lavoro va in fondo per la riuscita.
+export function ordina(squadra: readonly MembroSquadra[], ordine: Ordine): MembroSquadra[] {
+  const xp = perEsperienza(squadra);
+  if (ordine === 'chiamate') return xp.sort((a, b) => b.statistiche.incarichi - a.statistiche.incarichi);
+  if (ordine === 'riuscita') return xp.sort((a, b) => (b.riuscita ?? -1) - (a.riuscita ?? -1));
+  return xp;
+}
+
+// I primi tre per XP, solo chi ne ha.
+export const podio = (squadra: readonly MembroSquadra[]): MembroSquadra[] => perEsperienza(squadra).filter((m) => m.statistiche.xp > 0).slice(0, 3);
+
+// Un motore di una versione precedente non manda titolo e badge: il titolo si ricava dal livello.
+const TITOLI = ['Apprendista', 'Operativo', 'Esperto', 'Veterano', 'Leggenda'];
+export const titoloDi = (m: MembroSquadra): string => m.titolo ?? TITOLI[Math.min(4, Math.max(0, Math.floor((m.livello.livello - 1) / 2)))]!;
+export const badgeDi = (m: MembroSquadra) => m.badge ?? [];
+
+// Nella carta: gli ultimi badge presi (i più difficili), al massimo n.
+export const badgeInVetrina = (m: MembroSquadra, n = 3) => badgeDi(m).filter((b) => b.preso).slice(-n).reverse();
+
+// "mancano 140 XP al livello 5"; null al livello massimo.
+export function mancano(m: MembroSquadra): { xp: number; livello: number } | null {
+  const l = m.livello;
+  return l.prossimo === null ? null : { xp: Math.max(0, l.prossimo - l.xp), livello: l.livello + 1 };
+}
+
 export interface ValoreSquadra {
   squadra: MembroSquadra[];
   procedure: Procedura[];

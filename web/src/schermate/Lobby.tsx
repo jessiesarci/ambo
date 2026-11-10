@@ -17,8 +17,9 @@ const ESITO_STILE: Record<string, string> = {
   chiuso_da_utente: 'bg-[#eceef1] text-[#4a5058]',
 };
 
-export function Lobby({ info, accessi, archivio, serverGiu, onApri, onRivedi, onCartelle, onChat }: {
+export function Lobby({ info, accessi, archivio, serverGiu, avviso, onApri, onRivedi, onCartelle, onChat }: {
   info?: Info;
+  avviso?: string; // il server non risponde: una riga sotto la testata
   accessi?: Accessi;
   archivio: Riassunto[] | null;
   serverGiu: boolean;
@@ -35,12 +36,14 @@ export function Lobby({ info, accessi, archivio, serverGiu, onApri, onRivedi, on
     <div className="pointer-events-none flex h-full flex-col gap-2">
       <div className="pannello pointer-events-auto flex flex-wrap items-center gap-3 self-start px-4 py-2.5">
         {onChat && <button className="tasto" onClick={onChat}><MessageSquare size={16} /> Chat</button>}
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-inchiostro text-giallo"><Swords size={20} /></span>
+        <span className="hidden h-9 w-9 place-items-center rounded-xl bg-inchiostro text-giallo sm:grid"><Swords size={20} /></span>
         <div>
-          <h1 className="font-titolo text-[20px] font-bold leading-none">Partite e produzione</h1>
-          <p className="mt-1 text-[12.5px] text-grafite">Un obiettivo, Claude e Codex che preparano il piano, poi il lavoro fatto.</p>
+          <h1 className="font-titolo text-[18px] font-bold leading-none sm:text-[20px]">Partite e produzione</h1>
+          <p className="mt-1 hidden text-[12.5px] text-grafite sm:block">Un obiettivo, Claude e Codex che preparano il piano, poi il lavoro fatto.</p>
         </div>
       </div>
+
+      {avviso && <p className="pannello pointer-events-auto self-start !border-[#141518] px-3 py-2 text-[13px]" role="status">{avviso}</p>}
 
       <div className="pointer-events-auto flex gap-1 self-start md:hidden" role="tablist">
         {(['nuova', 'archivio', 'squadra'] as const).map((s) => (
@@ -50,26 +53,33 @@ export function Lobby({ info, accessi, archivio, serverGiu, onApri, onRivedi, on
         ))}
       </div>
 
+      {/* Sul telefono i pannelli stanno sotto la testata senza mai superarla (max-h-full): prima, con
+          lo schermo basso, la scheda aperta saliva sopra la testata e le schede. Tra 768 e 815 px le
+          due colonne fisse non ci stanno: si stringe il modulo, la colonna di destra resta intera. */}
       <div className="flex min-h-0 flex-1 items-end gap-3 md:items-stretch md:justify-between">
-        <div className={`${scheda === 'nuova' ? 'flex' : 'hidden'} min-h-0 w-full md:flex md:w-[420px]`}>
+        <div className={`${scheda === 'nuova' ? 'flex' : 'hidden'} max-h-full min-h-0 w-full md:flex md:w-[420px] md:min-w-0`}>
           <NuovaPartita info={info} accessi={accessi} archivio={archivio} serverGiu={serverGiu} onCreata={onApri} onCartelle={onCartelle} />
         </div>
         {/* Sul computer archivio e squadra stanno uno sopra l'altro, a destra; sul telefono sono schede. */}
-        <div className={`${scheda === 'nuova' ? 'hidden' : 'flex'} max-h-[70vh] min-h-0 w-full flex-col gap-2 md:flex md:max-h-none md:w-[360px]`}>
-          {/* L'archivio prende quello che gli serve, fino a metà colonna; il resto è della squadra. */}
-          <div className={`${scheda === 'archivio' ? 'flex' : 'hidden'} min-h-0 w-full md:flex md:max-h-[55%] md:flex-none`}>
+        <div className={`${scheda === 'nuova' ? 'hidden' : 'flex'} h-full max-h-full min-h-0 w-full flex-col gap-2 md:flex md:w-[360px] md:shrink-0 lg:w-[400px]`}>
+          {/* L'archivio prende quello che gli serve, fino a quattro decimi della colonna; il resto è della squadra. */}
+          <div className={`${scheda === 'archivio' ? 'flex' : 'hidden'} min-h-0 w-full md:flex md:max-h-[40%] md:flex-none ${scheda === 'archivio' ? 'mt-auto md:mt-0' : ''}`}>
             <Archivio archivio={archivio} serverGiu={serverGiu} onApri={onApri} onRivedi={onRivedi} />
           </div>
-          <div className={`${scheda === 'squadra' ? 'flex' : 'hidden'} min-h-0 w-full md:flex md:flex-1`}>
+          <div className={`${scheda === 'squadra' ? 'flex' : 'hidden'} min-h-0 w-full flex-1 md:flex`}>
             <PannelloSquadra aperto={assistente} onApri={(id) => setAssistente(assistente === id ? null : id)} caricamento={caricamento} />
           </div>
         </div>
       </div>
 
-      {/* La scheda dell'assistente: accanto al pannello sul computer, sopra tutto sul telefono. */}
+      {/* La scheda completa: sul telefono a tutto schermo, sul computer al centro sopra un velo. Un
+          tocco sul velo, la X o Esc la chiudono. Copre tutto, quindi è una finestra modale vera: il Tab
+          resta dentro e alla chiusura il focus torna alla carta che l'ha aperta. */}
       {assistente && (
-        <div className="pointer-events-auto fixed inset-x-2 top-16 z-30 flex justify-center md:inset-x-auto md:bottom-3 md:right-[384px] md:top-auto md:w-96">
-          <SchedaAssistente id={assistente} onChiudi={() => setAssistente(null)} />
+        <div className="pointer-events-auto fixed inset-0 z-40 flex items-stretch justify-center md:items-center md:bg-[#0b0c0e]/25 md:p-6" onClick={() => setAssistente(null)}>
+          <div className="flex w-full md:max-h-[88dvh] md:max-w-[560px]" onClick={(e) => e.stopPropagation()}>
+            <SchedaAssistente id={assistente} modale onChiudi={() => setAssistente(null)} className="max-md:!rounded-none max-md:!border-0 max-md:pt-[max(1rem,env(safe-area-inset-top))] max-md:pb-[max(1rem,env(safe-area-inset-bottom))]" />
+          </div>
         </div>
       )}
     </div>
@@ -141,7 +151,7 @@ function NuovaPartita({ info, accessi, archivio, serverGiu, onCreata, onCartelle
   };
 
   return (
-    <form className="pannello pointer-events-auto scorri flex max-h-[70vh] w-full flex-col gap-3 overflow-y-auto p-4 md:max-h-none" onSubmit={(e) => { e.preventDefault(); void avvia(); }}>
+    <form className="pannello pointer-events-auto scorri flex max-h-full w-full flex-col gap-3 overflow-y-auto p-4" onSubmit={(e) => { e.preventDefault(); void avvia(); }}>
       <h2 className="font-titolo text-[18px] font-bold">Nuova partita</h2>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="etichetta">Come lavorano</span>
@@ -228,7 +238,7 @@ function NuovaPartita({ info, accessi, archivio, serverGiu, onCreata, onCartelle
 
 function Archivio({ archivio, serverGiu, onApri, onRivedi }: { archivio: Riassunto[] | null; serverGiu: boolean; onApri: (id: string) => void; onRivedi: (id: string) => void }) {
   return (
-    <section className="pannello pointer-events-auto flex max-h-[70vh] min-h-0 w-full flex-col overflow-hidden md:max-h-none" aria-label="Archivio delle partite">
+    <section className="pannello pointer-events-auto flex max-h-full min-h-0 w-full flex-col overflow-hidden" aria-label="Archivio delle partite">
       <div className="flex items-center gap-2 border-b border-bordo px-4 py-3">
         <Archive size={18} />
         <h2 className="font-titolo text-[18px] font-bold">Archivio</h2>

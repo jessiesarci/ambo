@@ -40,7 +40,7 @@ Le CLI in chat e in partita girano in una cartella temporanea vuota (la "stanza"
 - Il testo di un agente che imita l'intestazione di un messaggio (tuo, dell'altro agente o del motore) viene marcato come citazione.
 - In chat la ricerca web è spenta.
 
-Sotto ogni risposta ci sono i token usati.
+Tempi e token usati di ogni risposta si vedono con un tocco sulla risposta; dal menu (**Mostra tempi e token**) restano sempre visibili. I messaggi del motore (partita avviata, conclusa, produzione pronta) mostrano la prima frase: un tocco apre il testo intero.
 
 Comandi della chat:
 
@@ -211,7 +211,19 @@ Le statistiche stanno in `dati/squadra.json`, per id (vale anche per gli agenti 
 | Collaudo superato | 20 a ogni assistente con un pacchetto fatto in quella produzione |
 | Incarico, pacchetto o revisione fallita | 0 |
 
-I livelli vanno da 1 a 10, con le soglie 0, 60, 160, 320, 560, 900, 1350, 1950, 2700, 3600 XP. Si contano anche le chiamate, i lavori completati e falliti, i pacchetti, i pacchetti finiti in un collaudo superato e la percentuale di riuscita. Uno stop chiesto dall'utente non conta come fallimento.
+I livelli vanno da 1 a 10, con le soglie 0, 60, 160, 320, 560, 900, 1350, 1950, 2700, 3600 XP. Ogni due livelli c'è un titolo: Apprendista (1-2), Operativo (3-4), Esperto (5-6), Veterano (7-8), Leggenda (9-10). Si contano anche le chiamate, i lavori completati e falliti, i pacchetti, i pacchetti finiti in un collaudo superato e la percentuale di riuscita. Uno stop chiesto dall'utente non conta come fallimento.
+
+I **badge** non si salvano: il motore li calcola dalle statistiche a ogni richiesta del catalogo, quindi una regola nuova vale subito anche per il passato.
+
+| Badge | Regola |
+|---|---|
+| Prima consegna | il primo lavoro portato a termine |
+| 10 rapporti, 25 rapporti | rapporti consegnati in riunione o revisioni al collaudo (i pacchetti contano a parte) |
+| Collaudo superato, 5 collaudi | suoi pacchetti finiti in un collaudo superato; solo per chi lavora in produzione |
+| Affidabile | riuscita del 90% o più su almeno 10 lavori finiti, arrotondata come nella scheda |
+| Instancabile | 50 chiamate |
+| Livello 5 | arrivare al livello 5 |
+| Il più chiamato | il primo della squadra per chiamate (se nessuno è stato chiamato, nessuno) |
 
 ## Produzione
 
@@ -237,9 +249,19 @@ La cartella originale non viene mai toccata. Se fermi la produzione o c'è un er
 
 La scena 3D mostra gli agenti come omini. Lo stato viene dagli eventi delle CLI: ragiona, cerca nelle note, scrive la risposta, lavora nel cantiere.
 
-Gli assistenti chiamati nella partita aperta occupano le 7 scrivanie libere della parete nord, nell'ordine della prima chiamata; se sono di più, compaiono solo nei pannelli (sul telefono se ne vedono al massimo tre). Sono seduti quando sono liberi e scrivono quando lavorano a un incarico o a un pacchetto, con il fumetto "Al lavoro". Il cartellino porta il nome, il livello e la barra dell'XP. Toccandolo si apre la **scheda dell'assistente**: ruolo, livello, barra dell'XP, skill, statistiche, cosa fa adesso e gli incarichi della partita aperta.
+L'ufficio è diviso in **reparti**, ognuno con un tappeto, un cartello a terra e le sue postazioni: Direzione (Claude e Codex), Ricerca e analisi (ricerca, analisi), Progettazione (architettura, design), Contenuti (testi), Sviluppo (sviluppo), Qualità (controllo) e Ospiti, la zona relax. Ci sono anche la sala riunioni e il magazzino della produzione.
 
-Nella pagina delle partite il pannello **Squadra** elenca tutto il catalogo con livello, barra dell'XP e quante volte è stato chiamato ogni assistente, più le procedure.
+- **Claude e Codex** stanno in sala solo durante la riunione, sintesi e verifica comprese. Il resto del tempo, anche in chat, sono alle loro scrivanie in Direzione. Codex va al banco del collaudo quando la produzione è in collaudo. Tra le loro scrivanie una lavagna mostra la partita aperta: titolo, stato e il piano (i pacchetti, le decisioni o l'ultima posizione con i punti aperti).
+- **Gli assistenti** chiamati nella partita aperta siedono nel loro reparto, nell'ordine della prima chiamata. I 7 di serie hanno un posto fisso, che gli altri non prendono. Un agente dell'utente va al reparto ricavato dalla procedura (un passo di collaudo porta a Qualità), dalla produzione (Sviluppo) o da parole del suo id, ruolo e descrizione; altrimenti agli ospiti. Un reparto pieno manda agli ospiti; se sono pieni anche loro, l'assistente compare solo nei pannelli.
+- Sono seduti quando sono liberi e scrivono quando lavorano a un incarico o a un pacchetto, con il fumetto "Al lavoro" e lo schermo acceso del loro colore. Il reparto dove qualcuno lavora ha il filo a terra lime. Il cartellino porta il nome, il livello e la barra dell'XP, nel colore dell'avatar. Toccandolo si apre la **scheda dell'assistente**.
+- **Catena di montaggio.** Nel magazzino la linea ha le fasi vere della produzione: 1 Piano (la sintesi approvata), 2 Costruzione (una postazione per pacchetto, con l'assistente che lo costruisce), 3 Collaudo (Codex e gli assistenti di collaudo della procedura), 4 Correzioni (il cartello resta spento se non servono), 5 Consegna. La scatola del lavoro sta alla stazione dove la produzione è davvero, anche se è ferma; ogni pacchetto finito lascia una scatoletta sulla sua postazione.
+- **Grafica ridotta.** Di serie sul telefono, e da sola quando il PC rallenta molto o il browser perde il contesto WebGL: niente effetti di resa, ombre aggiornate poche volte al secondo, animazioni a 15 fotogrammi e al massimo 4 assistenti animati, prima chi lavora.
+
+Nella pagina delle partite il pannello **Squadra** mostra il podio dei tre con più XP (solo chi ne ha) e una carta per assistente: avatar, nome, livello, barra dell'XP e gli ultimi tre badge presi. L'ordine si sceglie tra esperienza, chiamate e riuscita. Sotto ci sono le procedure.
+
+La **scheda dell'assistente** si apre da una carta, da un cartellino o da una riga del registro: avatar, nome, ruolo, titolo e livello, barra dell'XP con quanto manca al livello dopo, tutti i badge (presi e da prendere), la descrizione intera, skill, statistiche e gli ultimi lavori con il loro esito. Sul telefono occupa tutto lo schermo; si chiude con la X, con Esc o toccando fuori.
+
+Gli avatar sono ritratti disegnati dal programma, stabili per id: per i 7 di serie scelti a mano, per gli agenti dell'utente ricavati dall'id.
 
 Toccando un omino o il suo cartellino si apre la **scheda dell'agente**:
 
@@ -248,7 +270,7 @@ Toccando un omino o il suo cartellino si apre la **scheda dell'agente**:
 - le skill in uso, solo se la CLI conferma di averle usate;
 - le skill a disposizione su questo PC.
 
-Il pannello **Lavori** elenca le partite e le produzioni al lavoro e quelle che aspettano una tua decisione.
+In chat i **Lavori** stanno in una riga sola ("2 da decidere · 1 al lavoro"). Un tocco apre l'elenco: prima quello che aspetta una tua decisione (fermo nelle ultime 24 ore), poi le partite e le produzioni al lavoro.
 
 ## Note e profilo
 
@@ -275,7 +297,7 @@ Con `AMBO_AMBIENTE` spento (di serie) Claude parte senza le tue impostazioni ute
 ## Voce
 
 - **Trascrizione sul PC**: il motore avvia un processo Python con faster-whisper (modello `small`, su CPU) alla prima richiesta, lo tiene in memoria per un po' e poi lo spegne. L'audio sta su disco solo il tempo della trascrizione. L'audio non esce dal PC.
-- **Dettatura del browser**: la fa il browser, con i servizi di Google o di Apple. Si sceglie dal menu della chat.
+- **Dettatura del browser**: la fa il browser, con il servizio vocale di chi lo fa (per esempio Google con Chrome o Apple con Safari). Si sceglie dal menu della chat.
 
 La trascrizione sul PC usa la lingua di `AMBO_LINGUA_VOCE` (di serie `it`). Con `AMBO_WHISPER_PAROLE` si suggeriscono al modello altre parole che sbaglia facilmente, separate da virgole: si aggiungono a un elenco di base (Claude, Codex, ChatGPT, ...). Il programma toglie anche le frasi che Whisper a volte "sente" nel silenzio, come le righe di chiusura dei sottotitoli.
 

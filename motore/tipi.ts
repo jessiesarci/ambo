@@ -117,11 +117,23 @@ export interface LivelloAssistente {
   prossimo: number | null; // XP del livello dopo; null al livello massimo
 }
 
+// Un traguardo della squadra: si calcola dalle statistiche, non si salva. icona è un nome
+// che la UI traduce in un disegno (niente emoji); regola è la condizione scritta in una riga.
+export interface BadgeAssistente {
+  id: string;
+  nome: string;
+  icona: string;
+  regola: string;
+  preso: boolean;
+}
+
 // Come arriva alla UI in /api/info: definizione, statistiche e livello già calcolato.
 export type MembroSquadra = Assistente & {
   statistiche: StatisticheAssistente;
   livello: LivelloAssistente;
   riuscita: number | null; // completati su quelli finiti, in percentuale; null se non ha mai lavorato
+  titolo: string; // il titolo della fascia di livello: Apprendista, Operativo, Esperto, Veterano, Leggenda
+  badge: BadgeAssistente[]; // tutti quelli che può prendere, presi e no, nell'ordine in cui si prendono
 };
 
 // annullato: la riunione si è chiusa (l'ha conclusa l'utente) prima che toccasse a lui.

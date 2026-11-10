@@ -35,13 +35,14 @@ export function Fumetto({ tono, children }: { tono: TonoFumetto; children: React
 }
 
 // livello e xp (da 0 a 1 verso il livello dopo) solo per gli assistenti della squadra: il chip
-// "Lv N" nella pillola e una barretta lime sotto, sottile per non coprire la scena.
-export function Targhetta({ nome, colore, sotto, livello, xp }: { nome: string; colore: string; sotto?: ReactNode; livello?: number; xp?: number }) {
+// "Lv N" nella pillola e una barretta lime sotto, sottile per non coprire la scena. avatar: il mini
+// ritratto al posto del pallino, così il cartellino e la carta della squadra si riconoscono.
+export function Targhetta({ nome, colore, sotto, livello, xp, avatar }: { nome: string; colore: string; sotto?: ReactNode; livello?: number; xp?: number; avatar?: ReactNode }) {
   return (
     <div className="flex select-none flex-col items-center">
       {sotto}
-      <div className="flex items-center gap-1.5 rounded-full bg-[#141518]/85 px-2 py-0.5 font-titolo text-[11px] font-semibold tracking-wide text-white shadow">
-        <span className="h-2 w-2 rounded-full" style={{ background: colore }} />
+      <div className={`flex items-center gap-1.5 rounded-full bg-[#141518]/85 py-0.5 pr-2 font-titolo text-[11px] font-semibold tracking-wide text-white shadow ${avatar ? 'pl-0.5' : 'pl-2'}`}>
+        {avatar ?? <span className="h-2 w-2 rounded-full" style={{ background: colore }} />}
         {nome}
         {livello !== undefined && <span className="rounded-[4px] bg-[#b5f900] px-1 font-dati text-[9.5px] font-bold leading-[14px] text-[#141518]">Lv {livello}</span>}
       </div>

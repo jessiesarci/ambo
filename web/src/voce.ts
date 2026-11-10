@@ -1,6 +1,6 @@
 // La voce: registra dal microfono e manda l'audio al PC, che lo trascrive in locale
 // (faster-whisper). In alternativa la dettatura del browser (Web Speech), che mostra il testo mentre
-// si parla ma passa dai servizi di Google o Apple. E al contrario: le risposte lette ad alta voce.
+// si parla ma passa dal servizio vocale di chi fa il browser. E al contrario: le risposte lette ad alta voce.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.ts';
 

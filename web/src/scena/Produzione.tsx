@@ -1,79 +1,94 @@
-// La produzione come officina digitale: qui le decisioni diventano file e codice, non pacchi.
-// Una linea attraversa quattro stazioni scritte a terra (decisione, cantiere di Claude, collaudo di
-// Codex, consegna) fino all'archivio. Intorno, armadi server con le spie che lampeggiano, la
-// postazione del cantiere con i suoi schermi e la console del collaudo, che si accendono quando la
-// decisione della partita aperta è in lavorazione.
+// Il magazzino: la catena di montaggio fedele alle fasi vere della produzione. Cinque
+// stazioni lungo il nastro: 1 Piano (la sintesi approvata), 2 Costruzione (una postazione per
+// pacchetto, con chi lo costruisce), 3 Collaudo (il banco di Codex e degli assistenti di collaudo
+// della procedura), 4 Correzioni (solo se il collaudo le chiede), 5 Consegna, poi l'archivio.
+// La scatola del lavoro sta alla stazione dove la produzione è davvero; ogni pacchetto finito lascia
+// una scatoletta lime sulla sua postazione. Intorno, gli armadi server con le spie.
 // Modelli: Kenney Factory Kit 3.0 (CC0) per nastro, bracci e scanner; il resto è fatto a mano.
-import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
-import { useMemo, useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import type { StatoProduzione } from '../../../motore/tipi.ts';
-import { Postazione } from './Edificio.tsx';
-import { Modello, misura, precarica, temaScena } from './Modello.tsx';
-import { COLORI, LIME, LINEA, NERO } from './pianta.ts';
+import { coloreAgente } from '../avatar.ts';
+import { Cartello } from './Cartello.tsx';
+import { Modello, precarica } from './Modello.tsx';
+import { SchermiAccesi, Scrivanie, type StatoSchermo } from './Mobili.tsx';
+import { CARTELLI_LINEA_Z, COLLAUDO, COLORI, LIME, LINEA, NERO, SCRIVANIA_CORREZIONI, scrivanieCostruzione, STAZIONI, type Stazione } from './pianta.ts';
+import type { StatoCatena, TonoScatola } from './reparti.ts';
 
 const F = (n: string) => `/modelli/fabbrica/${n}.glb`;
 
-precarica([
-  F('conveyor-long-stripe-sides'), F('machine-window'), F('robot-arm-a'), F('robot-arm-b'), F('scanner-high'), F('box-small'),
-  F('hopper-square'), F('screen-hanging-wide'),
-]);
+precarica([F('conveyor-long-stripe-sides'), F('machine-window'), F('robot-arm-a'), F('robot-arm-b'), F('scanner-high'), F('hopper-square'), F('screen-hanging-wide')]);
 
-// Pacchetti che scorrono sulla linea, tutti in un InstancedMesh con la geometria della scatola Kenney.
-function PacchettiSullaLinea({ consegna, decisione }: { consegna: number; decisione: boolean }) {
-  const { scene } = useGLTF(F('box-small'));
-  temaScena(scene);
-  const N = 7;
-  const mesh = useRef<THREE.InstancedMesh>(null!);
+const TONO: Record<TonoScatola, string> = { lavoro: LIME, pronta: LIME, rivedere: '#c4c8ce', ferma: '#9aa0a6', errore: COLORI.errore };
+
+// Dove sta la scatola sul nastro, per stazione (alla costruzione: davanti alla postazione del pacchetto).
+function xScatola(stazione: Stazione, indice: number | undefined, n: number): number {
+  if (stazione === 2 && indice !== undefined) return scrivanieCostruzione(n)[Math.min(indice, n - 1)]?.punto[0] ?? STAZIONI[2].x;
+  return STAZIONI[stazione].x;
+}
+
+// La scatola del lavoro: scivola sul nastro fino alla stazione vera, senza salti. In più, a fine
+// riunione, la decisione appena arrivata fa il suo giro dalla porta (fino al Piano se va in produzione,
+// fino all'archivio se è un verbale).
+function Scatole({ idProduzione, catena, consegna, decisione, finoAlPiano, ancora }: {
+  idProduzione: string;
+  catena: StatoCatena;
+  consegna: number;
+  decisione: boolean;
+  finoAlPiano: boolean;
+  ancora?: (o: THREE.Object3D | null) => void;
+}) {
+  const lavoro = useRef<THREE.Group>(null!);
+  const materiale = useMemo(() => new THREE.MeshStandardMaterial({ color: LIME, roughness: 0.55, emissive: LIME, emissiveIntensity: 0.2 }), []);
   const speciale = useRef<THREE.Mesh>(null!);
-  const avvio = useRef<{ giro: number; t: number } | null>(null);
+  const avvio = useRef<number | null>(null);
   const ultimo = useRef(consegna);
-  const { geometria, materiale, scala } = useMemo(() => {
-    let g: THREE.BufferGeometry | undefined;
-    let m: THREE.Material | undefined;
-    scene.traverse((o) => {
-      const x = o as THREE.Mesh;
-      if (x.isMesh && !g) {
-        g = x.geometry;
-        m = x.material as THREE.Material;
+  const s = catena.scatola;
+  const meta = s ? xScatola(s.stazione, s.indice, catena.pacchetti.length) : LINEA.da;
+  const colore = s ? TONO[s.tono] : LIME;
+  const fine = finoAlPiano ? STAZIONI[1].x : LINEA.a;
+
+  useFrame(({ clock }, dt) => {
+    const g = lavoro.current;
+    g.visible = !!s;
+    // Sparita la produzione, la prossima (anche di un'altra partita) non parte da qui.
+    if (!s) g.userData.produzione = undefined;
+    if (s) {
+      // Una produzione nuova, o un'altra partita, compare già al suo posto; poi scivola a 1,2 m/s circa.
+      if (g.userData.produzione !== idProduzione) {
+        g.position.x = meta;
+        g.userData.produzione = idProduzione;
       }
-    });
-    const dim = misura(scene).getSize(new THREE.Vector3());
-    return { geometria: g!, materiale: m!, scala: 0.42 / dim.x };
-  }, [scene]);
-  const o = useMemo(() => new THREE.Object3D(), []);
-  const lunghezza = LINEA.da - LINEA.a;
-
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime;
-    for (let i = 0; i < N; i++) {
-      const f = ((t * 0.55) / lunghezza + i / N) % 1;
-      o.position.set(LINEA.da - f * lunghezza, 0.42, LINEA.z + Math.sin(i * 7.3) * 0.08);
-      o.rotation.set(0, Math.sin(i * 3.1) * 0.25, 0);
-      o.scale.setScalar(scala);
-      o.updateMatrix();
-      mesh.current.setMatrixAt(i, o.matrix);
+      g.position.x = THREE.MathUtils.damp(g.position.x, meta, 1.6, Math.min(dt, 0.1));
+      materiale.color.set(colore);
+      materiale.emissive.set(s.tono === 'lavoro' || s.tono === 'pronta' ? LIME : '#000000');
+      materiale.emissiveIntensity = s.tono === 'lavoro' ? 0.18 + Math.sin(clock.elapsedTime * 3) * 0.1 : 0.2;
     }
-    mesh.current.instanceMatrix.needsUpdate = true;
-
-    // La decisione appena arrivata: un pacchetto lime dall'inizio alla fine della linea.
     if (consegna !== ultimo.current) {
       ultimo.current = consegna;
-      avvio.current = { giro: consegna, t };
+      avvio.current = clock.elapsedTime;
     }
-    const s = speciale.current;
-    if (avvio.current) {
-      const f = (t - avvio.current.t) / (lunghezza / 0.9);
-      s.visible = f < 1;
-      s.position.set(LINEA.da - Math.min(f, 1) * lunghezza, 0.47, LINEA.z);
-      if (f >= 1) avvio.current = null;
-    } else s.visible = false;
+    const sp = speciale.current;
+    if (avvio.current !== null) {
+      const f = ((clock.elapsedTime - avvio.current) * 0.9) / (LINEA.da - fine);
+      sp.visible = f < 1 && f >= 0;
+      sp.position.set(LINEA.da - Math.min(Math.max(f, 0), 1) * (LINEA.da - fine), 0.47, LINEA.z);
+      if (f >= 1 || f < 0) avvio.current = null;
+    } else sp.visible = false;
   });
 
   return (
     <>
-      <instancedMesh ref={mesh} args={[geometria, materiale, N]} castShadow receiveShadow />
+      <group ref={lavoro} position={[meta, 0, LINEA.z]} visible={false}>
+        <mesh material={materiale} position={[0, 0.5, 0]} castShadow>
+          <boxGeometry args={[0.62, 0.48, 0.56]} />
+        </mesh>
+        {/* il nastro adesivo nero: si capisce che è una scatola anche dall'alto */}
+        <mesh material={M.nastro} position={[0, 0.745, 0]}>
+          <boxGeometry args={[0.63, 0.012, 0.12]} />
+        </mesh>
+        <group ref={ancora} position={[0, 1.15, 0]} />
+      </group>
       <mesh ref={speciale} visible={false} castShadow>
         <boxGeometry args={[0.55, 0.42, 0.5]} />
         <meshStandardMaterial color={decisione ? COLORI.linea : '#c4c8ce'} roughness={0.55} emissive={decisione ? COLORI.linea : '#000000'} emissiveIntensity={0.25} />
@@ -82,8 +97,8 @@ function PacchettiSullaLinea({ consegna, decisione }: { consegna: number; decisi
   );
 }
 
-// Armadi server in file (dove prima c'erano gli scaffali): neri, con le fessure delle unità e una
-// spia per unità su ogni faccia. Le spie cambiano di continuo, a caso, tra lime, bianco e spento.
+// Armadi server in file: neri, con le fessure delle unità e una spia per unità su ogni faccia. Le spie
+// cambiano a caso tra lime, bianco e spento (solo con la grafica piena: ridotto le tiene ferme).
 const FILE_SERVER = [
   { x: [-22.6, -18.2] as [number, number], z: -11.6, alto: 2.3 },
   { x: [-17.8, -13.4] as [number, number], z: -11.6, alto: 2.3 },
@@ -91,7 +106,7 @@ const FILE_SERVER = [
   { x: [-22.6, -18.2] as [number, number], z: -8.1, alto: 2.3 },
   { x: [-17.8, -13.4] as [number, number], z: -8.1, alto: 2.3 },
   { x: [-13, -8.6] as [number, number], z: -8.1, alto: 2.3 },
-  // Unità basse lungo la parete sud, dove arrivavano i pallet.
+  // Unità basse lungo la parete sud.
   { x: [-20.8, -14.4] as [number, number], z: 12.6, alto: 1.15 },
 ];
 const LARGO_UNITA = 0.72;
@@ -100,10 +115,13 @@ const M = {
   armadio: new THREE.MeshStandardMaterial({ color: NERO, roughness: 0.42, metalness: 0.35 }),
   fessura: new THREE.MeshStandardMaterial({ color: '#2a2d31', roughness: 0.6 }),
   lime: new THREE.MeshBasicMaterial({ color: LIME, toneMapped: false }),
+  nastro: new THREE.MeshStandardMaterial({ color: NERO, roughness: 0.5 }),
+  fatto: new THREE.MeshStandardMaterial({ color: LIME, roughness: 0.55, emissive: LIME, emissiveIntensity: 0.15 }),
+  fallito: new THREE.MeshStandardMaterial({ color: COLORI.errore, roughness: 0.55 }),
 };
 const SPIE = [new THREE.Color(LIME), new THREE.Color('#ffffff'), new THREE.Color('#2a2d31'), new THREE.Color(LIME)];
 
-function ArmadiServer() {
+function ArmadiServer({ ridotto }: { ridotto: boolean }) {
   const { armadi, fessure, spie, n } = useMemo(() => {
     const unita: { x: number; z: number; alto: number }[] = [];
     for (const f of FILE_SERVER) for (let x = f.x[0] + LARGO_UNITA / 2; x <= f.x[1] - LARGO_UNITA / 2 + 0.01; x += LARGO_UNITA + 0.02) unita.push({ x, z: f.z, alto: f.alto });
@@ -143,7 +161,7 @@ function ArmadiServer() {
   // Una manciata di spie cambia stato ogni 0,15 s: il lavoro dei server, senza costare nulla.
   const ultimo = useRef(0);
   useFrame(({ clock }) => {
-    // Dopo una pausa della scena l'orologio riparte da zero.
+    if (ridotto) return;
     if (clock.elapsedTime < ultimo.current) ultimo.current = clock.elapsedTime;
     if (clock.elapsedTime - ultimo.current < 0.15) return;
     ultimo.current = clock.elapsedTime;
@@ -156,7 +174,6 @@ function ArmadiServer() {
       <primitive object={armadi} />
       <primitive object={fessure} />
       <primitive object={spie} />
-      {/* Un filo lime in cima a ogni fila */}
       {FILE_SERVER.map((f, i) => (
         <mesh key={i} material={M.lime} position={[(f.x[0] + f.x[1]) / 2, f.alto + 0.012, f.z]}>
           <boxGeometry args={[f.x[1] - f.x[0] - 0.1, 0.025, 0.06]} />
@@ -166,101 +183,97 @@ function ArmadiServer() {
   );
 }
 
-// Le stazioni della linea, scritte a terra: numero su un quadrato lime e nome in nero.
-function Targa({ numero, testo, x, z, larghezza = 2.8 }: { numero: string; testo: string; x: number; z: number; larghezza?: number }) {
-  const mappa = useMemo(() => {
-    const c = document.createElement('canvas');
-    c.width = 1024;
-    c.height = 200;
-    const g = c.getContext('2d')!;
-    // Fascia nera, numero su quadrato lime, nome in bianco: si legge anche da lontano.
-    g.fillStyle = NERO;
-    g.fillRect(0, 0, 1024, 200);
-    g.fillStyle = LIME;
-    g.fillRect(0, 0, 200, 200);
-    g.fillStyle = NERO;
-    g.font = 'bold 112px "Chakra Petch", ui-sans-serif, sans-serif';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(numero, 100, 106);
-    g.textAlign = 'left';
-    g.fillStyle = '#ffffff';
-    g.font = 'bold 78px "Chakra Petch", ui-sans-serif, sans-serif';
-    g.fillText(testo.toUpperCase(), 236, 106, 760);
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 4;
-    return t;
-  }, [numero, testo]);
-  return (
-    <mesh position={[x, 0.012, z]} rotation-x={-Math.PI / 2} receiveShadow>
-      <planeGeometry args={[larghezza, (larghezza * 200) / 1024]} />
-      <meshStandardMaterial map={mappa} roughness={0.7} />
-    </mesh>
-  );
-}
-
-// Schermi che si accendono quando la loro stazione lavora.
-function usaSchermo(acceso: boolean, colore: string) {
-  const m = useMemo(() => new THREE.MeshStandardMaterial({ color: '#0b0c0e', emissive: colore, emissiveIntensity: 0.15, roughness: 0.3 }), [colore]);
+// Il banco del collaudo: lungo e nero, con tre schermi inclinati verso chi sta in piedi a sud.
+function BancoCollaudo({ acceso }: { acceso: boolean }) {
+  const schermo = useMemo(() => new THREE.MeshBasicMaterial({ color: '#15171a', toneMapped: false }), []);
   useFrame(({ clock }) => {
-    m.emissiveIntensity = acceso ? 0.9 + Math.sin(clock.elapsedTime * 4) * 0.35 : 0.12;
+    schermo.color.set(acceso ? LIME : '#15171a');
+    if (acceso) schermo.color.multiplyScalar(0.7 + Math.sin(clock.elapsedTime * 4) * 0.25);
   });
-  return m;
-}
-
-// La console del collaudo: un leggio nero con lo schermo inclinato.
-function Console({ position, schermo }: { position: [number, number, number]; schermo: THREE.Material }) {
+  const [xa, xb] = COLLAUDO.x;
+  const lungo = Math.abs(xb - xa);
+  const cx = (xa + xb) / 2;
   return (
-    <group position={position}>
-      <mesh material={M.armadio} position={[0, 0.5, 0]} castShadow receiveShadow>
-        <boxGeometry args={[0.9, 1, 0.55]} />
+    <group position={[cx, 0, COLLAUDO.z]}>
+      <mesh material={M.armadio} position={[0, 0.48, 0]} castShadow receiveShadow>
+        <boxGeometry args={[lungo, 0.96, 0.6]} />
       </mesh>
-      <mesh material={schermo} position={[0, 1.08, 0.08]} rotation-x={-0.6}>
-        <boxGeometry args={[0.82, 0.03, 0.42]} />
-      </mesh>
-      <mesh material={M.lime} position={[0, 0.03, 0.281]}>
-        <boxGeometry args={[0.9, 0.04, 0.01]} />
+      {[-1, 0, 1].map((k) => (
+        <mesh key={k} material={schermo} position={[k * lungo * 0.31, 1.04, 0.06]} rotation-x={-0.95}>
+          <boxGeometry args={[0.72, 0.4, 0.025]} />
+        </mesh>
+      ))}
+      <mesh material={M.lime} position={[0, 0.03, 0.301]}>
+        <boxGeometry args={[lungo, 0.04, 0.01]} />
       </mesh>
     </group>
   );
 }
 
-export function Produzione({ consegna, decisione, lavoro }: { consegna: number; decisione: boolean; lavoro?: StatoProduzione }) {
+export const Produzione = memo(function Produzione({ idProduzione, catena, consegna, decisione, finoAlPiano, ridotto, ancora }: {
+  idProduzione: string; // partita e inizio della produzione: se cambia, la scatola non scivola dalla vecchia stazione
+  catena: StatoCatena;
+  consegna: number;
+  decisione: boolean;
+  finoAlPiano: boolean; // la decisione appena arrivata va in produzione: si ferma al Piano
+  ridotto: boolean;
+  ancora?: (o: THREE.Object3D | null) => void; // per l'etichetta della scatola del lavoro
+}) {
   const segmenti = useMemo(() => {
     const s: number[] = [];
     for (let x = LINEA.da - 1; x > LINEA.a; x -= 2) s.push(x);
     return s;
   }, []);
   const z = LINEA.z;
-  const schermoCantiere = usaSchermo(lavoro === 'in_lavorazione', LIME);
-  const schermoCollaudo = usaSchermo(lavoro === 'collaudo', LIME);
+  // Senza produzione la costruzione ha due postazioni libere; con la produzione una per pacchetto.
+  const n = catena.pacchetti.length || 2;
+  const costruzione = useMemo(() => scrivanieCostruzione(n), [n]);
+  const scrivanie = useMemo(() => [...costruzione, SCRIVANIA_CORREZIONI], [costruzione]);
+  const correzione = catena.lavora && catena.posti.get(catena.lavora.id)?.dove === 'correzioni' ? catena.lavora.id : undefined;
+  const stati: (StatoSchermo | null)[] = [
+    ...costruzione.map((_, i) => {
+      const p = catena.pacchetti[i];
+      if (!p) return null;
+      return p.stato === 'in_corso' ? { colore: coloreAgente(p.assistente), lavora: catena.attiva } : p.stato === 'fatto' ? { colore: LIME, lavora: false } : null;
+    }),
+    correzione ? { colore: coloreAgente(correzione), lavora: true } : null,
+  ];
+  // Una scatoletta sulla postazione di ogni pacchetto finito (rossa se non è riuscito).
+  const finiti = catena.pacchetti.map((p, i) => ({ p, s: costruzione[i] })).filter((x) => x.s && (x.p.stato === 'fatto' || x.p.stato === 'fallito'));
+  const quale = catena.scatola?.stazione;
+
   return (
     <group>
-      {/* La linea e le sue macchine */}
+      {/* Il nastro e le sue macchine */}
       {segmenti.map((x) => (
         <Modello key={x} url={F('conveyor-long-stripe-sides')} larghezza={2} position={[x, 0, z]} />
       ))}
-      <Modello url={F('hopper-square')} altezza={1.1} position={[-4.4, 0, z - 1.3]} />
-      <Modello url={F('machine-window')} profondita={1.5} position={[-7.5, 0, z]} rotation={Math.PI / 2} />
-      <Modello url={F('screen-hanging-wide')} larghezza={0.9} position={[-7.5, 1.6, z - 1.1]} />
-      <Modello url={F('robot-arm-a')} altezza={2.6} position={[-10.6, 0, z - 1.25]} rotation={Math.PI} />
-      <Modello url={F('scanner-high')} altezza={1.5} position={[-13.4, 0, z]} rotation={Math.PI / 2} />
-      <Modello url={F('robot-arm-b')} altezza={2.4} position={[-16.2, 0, z + 1.25]} />
-      <PacchettiSullaLinea consegna={consegna} decisione={decisione} />
+      <Modello url={F('hopper-square')} altezza={1.1} position={[STAZIONI[1].x, 0, z - 1.3]} />
+      {/* La macchina chiude la costruzione: la scatola davanti alle postazioni resta in vista. */}
+      <Modello url={F('machine-window')} profondita={1.5} position={[-11.85, 0, z]} rotation={Math.PI / 2} />
+      <Modello url={F('screen-hanging-wide')} larghezza={0.9} position={[-11.85, 1.6, z - 1.1]} />
+      <Modello url={F('robot-arm-a')} altezza={2.6} position={[-6.4, 0, z - 1.25]} rotation={Math.PI} />
+      <Modello url={F('scanner-high')} altezza={1.5} position={[STAZIONI[3].x, 0, z]} rotation={Math.PI / 2} />
+      <Modello url={F('robot-arm-b')} altezza={2.4} position={[STAZIONI[4].x, 0, z - 1.25]} rotation={Math.PI} />
+      <Scatole idProduzione={idProduzione} catena={catena} consegna={consegna} decisione={decisione} finoAlPiano={finoAlPiano} ancora={ancora} />
 
-      {/* Le quattro stazioni, scritte a terra lungo la linea */}
-      <Targa numero="01" testo="Decisione" x={-4.5} z={z + 2.1} larghezza={2.9} />
-      <Targa numero="02" testo="Cantiere · Claude" x={-8.4} z={z + 2.1} larghezza={3.5} />
-      <Targa numero="03" testo="Collaudo · Codex" x={-12.6} z={z + 2.1} larghezza={3.5} />
-      <Targa numero="04" testo="Consegna" x={-17.6} z={z + 2.1} larghezza={2.9} />
+      {/* Le stazioni: postazioni della costruzione e delle correzioni, banco del collaudo */}
+      <Scrivanie scrivanie={scrivanie} extra={false} />
+      <SchermiAccesi scrivanie={scrivanie} stati={stati} />
+      {finiti.map(({ p, s }, i) => (
+        <mesh key={i} material={p.stato === 'fatto' ? M.fatto : M.fallito} position={[s!.punto[0] + 0.45, 0.745 + 0.11, s!.punto[1] + 0.05]} castShadow>
+          <boxGeometry args={[0.26, 0.22, 0.24]} />
+        </mesh>
+      ))}
+      <BancoCollaudo acceso={quale === 3 && !!catena.attiva} />
 
-      {/* Il cantiere: la postazione dove Claude costruisce, e la console del collaudo di Codex */}
-      <Postazione position={[-5.2, 0, -7.6]} schermo={schermoCantiere} extra="lampada" />
-      <Postazione position={[-3.78, 0, -7.6]} schermo={schermoCantiere} />
-      <Console position={[-13.4, 0, z - 1.6]} schermo={schermoCollaudo} />
+      {/* I cartelli delle stazioni: il nome della fase, non della CLI. Le correzioni restano spente
+          finché il collaudo non ne chiede. */}
+      {([1, 2, 3, 4, 5] as Stazione[]).map((k) => (
+        <Cartello key={k} sigla={`0${k}`} testo={STAZIONI[k].nome} x={STAZIONI[k].cartello} z={CARTELLI_LINEA_Z} larghezza={STAZIONI[k].larghezza} spento={k === 4 && !catena.correzioni} />
+      ))}
 
-      <ArmadiServer />
+      <ArmadiServer ridotto={ridotto} />
     </group>
   );
-}
+});

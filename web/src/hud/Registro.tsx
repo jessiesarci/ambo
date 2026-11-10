@@ -5,6 +5,7 @@ import type { Incarico } from '../../../motore/tipi.ts';
 import { alLavoro, breve, chiE, conRuolo, STATO_INCARICO, usaSquadra } from '../squadra.ts';
 import type { Vista } from '../stato.ts';
 import { ETICHETTE_ESITO } from '../stato.ts';
+import { Avatar } from './Avatar.tsx';
 import { NomeAgente, PastigliaStato } from './comuni.tsx';
 
 const STILE_INCARICO: Record<Incarico['stato'], string> = {
@@ -57,12 +58,12 @@ export function Registro({ vista, scelto, setScelto, onAssistente, onChiudi }: {
               return (
                 <button
                   key={x.id}
-                  className="ml-5 flex w-[calc(100%-1.25rem)] items-baseline gap-1 rounded-lg px-2 py-1 text-left text-[12px] leading-snug hover:bg-cartaScura disabled:hover:bg-transparent"
+                  className="ml-5 flex w-[calc(100%-1.25rem)] items-baseline gap-1.5 rounded-lg px-2 py-1 text-left text-[12px] leading-snug hover:bg-cartaScura disabled:hover:bg-transparent"
                   onClick={onAssistente ? () => onAssistente(x.assistente) : undefined}
                   disabled={!onAssistente}
                   title={x.compito}
                 >
-                  <span aria-hidden className="text-grafite">→</span>
+                  <Avatar id={x.assistente} dimensione={18} tondo className="self-center" />
                   <span className="min-w-0 flex-1">
                     <span className="font-semibold">{conRuolo(chi)}</span>: {breve(x.compito, 90)}
                     <span className={`whitespace-nowrap ${STILE_INCARICO[x.stato]}`}> · {STATO_INCARICO[x.stato]}</span>

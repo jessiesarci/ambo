@@ -2,9 +2,10 @@
 // e il replay che rimette in scena gli incarichi. Solo i moduli puri del web, niente DOM né 3D.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Corrente, Dibattito, Incarico, Turno } from '../motore/tipi.ts';
+import type { Corrente, Dibattito, Incarico, MembroSquadra, Turno } from '../motore/tipi.ts';
+import { coloreAgente, tratti } from '../web/src/avatar.ts';
 import { copioneReplay } from '../web/src/replay.ts';
-import { alLavoro, breve, chiamatiNellaPartita, chiE, inCoda } from '../web/src/squadra.ts';
+import { alLavoro, badgeInVetrina, breve, chiamatiNellaPartita, chiE, inCoda, mancano, ordina, podio } from '../web/src/squadra.ts';
 import { riduci, vistaVuota, type Vista } from '../web/src/stato.ts';
 
 const chiamata = { agente: 'claude' as const, modello: 'finto', sessione: 's', secondi: 10, uso: { ingresso: 1, inCache: 0, uscita: 1 }, controllo: 'finto', tentativi: 1 };
@@ -106,4 +107,39 @@ test('replay: ogni incarico eseguito passa da in coda a in corso a fatto, dopo i
   assert.ok(vista, 'Rita non è mai al lavoro nel replay');
   assert.equal(vista.parlante, undefined);
   assert.equal(v.dibattito?.turni[0]?.incarichi?.[0]?.rapporto, 'r1');
+});
+
+test('avatar: stabile per id, i 7 di serie tutti diversi, tinta esadecimale anche per gli agenti dell\'utente', () => {
+  const standard = ['ricerca', 'analisi', 'architettura', 'testi', 'design', 'sviluppo', 'controllo'];
+  const t = standard.map(tratti);
+  // Colore, testa e accessorio diversi per ognuno dei 7.
+  for (const campo of ['tinta', 'testa', 'accessorio'] as const) {
+    if (campo === 'testa') assert.ok(new Set(t.map((x) => x[campo])).size >= 6, campo);
+    else assert.equal(new Set(t.map((x) => x[campo])).size, 7, campo);
+  }
+  // Un agente dell'utente: sempre gli stessi tratti, colore valido e lontano dal lime.
+  assert.deepEqual(tratti('mio-costruttore'), tratti('mio-costruttore'));
+  assert.notDeepEqual(tratti('mio-costruttore'), tratti('mio-rifinitore'));
+  for (const id of ['mio-costruttore', 'mio-architetto', 'guida-accessibilita', 'x']) assert.match(coloreAgente(id), /^#[0-9a-f]{6}$/);
+  assert.equal(coloreAgente('ricerca'), tratti('ricerca').tinta);
+  assert.equal(coloreAgente('claude'), '#b5f900');
+});
+
+test('pannello Squadra: ordinamenti, podio solo con XP, vetrina degli ultimi tre badge, XP mancanti', () => {
+  const b = (id: string, preso: boolean) => ({ id, nome: id, icona: id, regola: '', preso });
+  const membro = (id: string, xp: number, incarichi: number, riuscita: number | null, livello: number, prossimo: number | null, badge = [b('a', true)]): MembroSquadra => ({
+    id, nome: id, ruolo: '', motore: 'claude', produzione: false, descrizione: '', skill: [], fonte: 'standard',
+    statistiche: { xp, incarichi, completati: 0, falliti: 0, pacchetti: 0, approvati: 0 },
+    livello: { livello, xp, base: 0, prossimo }, riuscita, titolo: 'Operativo', badge,
+  });
+  const s = [membro('a', 100, 9, 50, 2, 160), membro('b', 300, 2, 100, 3, 320), membro('c', 0, 0, null, 1, 60), membro('d', 50, 20, 90, 1, 60)];
+  assert.deepEqual(ordina(s, 'esperienza').map((m) => m.id), ['b', 'a', 'd', 'c']);
+  assert.deepEqual(ordina(s, 'chiamate').map((m) => m.id), ['d', 'a', 'b', 'c']);
+  assert.deepEqual(ordina(s, 'riuscita').map((m) => m.id), ['b', 'd', 'a', 'c']);
+  assert.deepEqual(podio(s).map((m) => m.id), ['b', 'a', 'd']);
+  assert.deepEqual(podio([membro('z', 0, 0, null, 1, 60)]), []);
+  const tanti = membro('e', 10, 1, 100, 1, 60, ['1', '2', '3', '4', '5'].map((x, i) => b(x, i !== 2)));
+  assert.deepEqual(badgeInVetrina(tanti).map((x) => x.id), ['5', '4', '2']);
+  assert.deepEqual(mancano(s[1]!), { xp: 20, livello: 4 });
+  assert.equal(mancano(membro('m', 4000, 1, 100, 10, null)), null);
 });

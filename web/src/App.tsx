@@ -91,8 +91,14 @@ export function App() {
   const [documento, setDocumento] = useState(false);
   // La scheda aperta: Claude o Codex (dalla scena o dalla chat) oppure un assistente della squadra.
   const [scheda, setScheda] = useState<SchedaAperta | null>(null);
-  const apriAgente = useCallback((agente: Agente) => setScheda({ tipo: 'agente', agente }), []);
-  const apriAssistente = useCallback((id: string) => setScheda({ tipo: 'assistente', id }), []);
+  // Sul telefono scheda e registro sono fogli nello stesso posto: aprendone uno si chiude l'altro
+  // (la scheda di Claude o Codex lascia scoperti i comandi, e il registro finiva sotto di lei).
+  const apriAgente = useCallback((agente: Agente) => { setScheda({ tipo: 'agente', agente }); if (stretto) setRegistro(false); }, [stretto]);
+  const apriAssistente = useCallback((id: string) => { setScheda({ tipo: 'assistente', id }); if (stretto) setRegistro(false); }, [stretto]);
+  const cambiaRegistro = () => {
+    if (stretto && !registro) setScheda(null);
+    setRegistro(!registro);
+  };
   const [errore, setErrore] = useState<string>();
   const [serverGiu, setServerGiu] = useState(false);
   const [pannelloCartelle, setPannelloCartelle] = useState(false);
@@ -233,19 +239,16 @@ export function App() {
         <div className="pointer-events-none absolute inset-0 flex flex-col gap-2 p-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:p-3">
           {!entrato ? null : !inPartita ? (
             <>
-              <Lobby info={info} accessi={accessi} archivio={partite} serverGiu={serverGiu} onApri={(id) => vai(`#/partita/${id}`)} onRivedi={(id) => vai(`#/replay/${id}`)} onCartelle={() => setPannelloCartelle(true)} onChat={() => vai('#/')} />
-              {avvisoServer && (
-                <div className="pointer-events-none fixed inset-x-2 bottom-2 flex justify-center">
-                  <Avvisi vista={vista} invia={invia} extra={[{ testo: avvisoServer }]} />
-                </div>
-              )}
+              {/* L'avviso del server sta nella colonna della lobby, sotto la testata: fisso in basso copriva
+                  il modulo e la squadra. */}
+              <Lobby info={info} accessi={accessi} archivio={partite} serverGiu={serverGiu} avviso={avvisoServer} onApri={(id) => vai(`#/partita/${id}`)} onRivedi={(id) => vai(`#/replay/${id}`)} onCartelle={() => setPannelloCartelle(true)} onChat={() => vai('#/')} />
             </>
           ) : (
             <>
               <Barra vista={vista} onIndietro={() => vai(d?.contestoChat ? `#/chat/${d.contestoChat.id}` : '#/partite')} segui={segui} setSegui={setSegui} etichetta={rotta.schermo === 'replay' ? 'Replay' : undefined} />
               <div className="flex min-h-0 flex-1 gap-2">
-                <div className="hidden min-w-0 flex-1 flex-col items-start gap-2 md:flex">
-                  {scheda && <Scheda scheda={scheda} vista={vista} info={info} onChiudi={() => setScheda(null)} />}
+                <div className="hidden min-h-0 min-w-0 flex-1 flex-col items-start gap-2 md:flex">
+                  {scheda && <Scheda scheda={scheda} vista={vista} info={info} onChiudi={() => setScheda(null)} className="max-h-full max-w-md" />}
                 </div>
                 <div className="ml-auto flex w-full flex-col items-end gap-2 md:max-w-sm">
                   <div className="pannello pointer-events-auto flex gap-1 p-1" role="group" aria-label="Inquadratura">
@@ -284,9 +287,9 @@ export function App() {
                 </div>
                 <div className="flex md:ml-auto">
                   {rotta.schermo === 'replay' ? (
-                    <ComandiReplay r={replay} onRegistro={() => setRegistro(!registro)} onDocumento={() => setDocumento(true)} concluso={d?.stato === 'concluso'} />
+                    <ComandiReplay r={replay} onRegistro={cambiaRegistro} onDocumento={() => setDocumento(true)} concluso={d?.stato === 'concluso'} />
                   ) : (
-                    <ComandiDalVivo vista={vista} onRegistro={() => setRegistro(!registro)} onDocumento={() => setDocumento(true)} onErrore={setErrore} />
+                    <ComandiDalVivo vista={vista} onRegistro={cambiaRegistro} onDocumento={() => setDocumento(true)} onErrore={setErrore} />
                   )}
                 </div>
               </div>
@@ -295,10 +298,11 @@ export function App() {
         </div>
       )}
 
-      {/* Sul telefono scheda e registro sono fogli sopra la scena, a tutta larghezza. */}
+      {/* Sul telefono la scheda di un assistente prende tutto lo schermo; quella di Claude o Codex e il
+          registro sono fogli sopra la scena, a tutta larghezza. */}
       {scheda && inPartita && (
-        <div className="pointer-events-auto fixed inset-x-2 top-16 z-30 md:hidden">
-          <Scheda scheda={scheda} vista={vista} info={info} onChiudi={() => setScheda(null)} />
+        <div className={`pointer-events-auto fixed z-40 md:hidden ${scheda.tipo === 'assistente' ? 'inset-0 flex' : 'inset-x-2 top-16'}`}>
+          <Scheda scheda={scheda} vista={vista} info={info} onChiudi={() => setScheda(null)} className="!rounded-none !border-0 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" />
         </div>
       )}
       {/* In chat la scheda dell'omino: sopra la scena a destra sul computer, in alto sul telefono. */}

@@ -4,6 +4,7 @@
 // Luce: un sole caldo da sud-ovest, alto 45°, che disegna ombre lunghe e nette, un cielo freddo che riempie
 // le ombre senza annerirle e lo studio HDRI per i riflessi sulla plastica.
 import { Environment } from '@react-three/drei';
+import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { materialeTerreno, texturaOmbra } from './materiali.ts';
@@ -15,6 +16,27 @@ const SOLE = new THREE.Vector3(-21, 27, 17);
 const BORDO = 0.6;
 const ALTEZZA = 1.1;
 const B = { x0: PAVIMENTO.x[0] - BORDO, x1: PAVIMENTO.x[1] + BORDO, z0: PAVIMENTO.z[0] - BORDO, z1: PAVIMENTO.z[1] + BORDO };
+
+// Grafica ridotta: la mappa delle ombre (un secondo disegno di tutta la scena) si rifà 4 volte al
+// secondo invece che a ogni fotogramma. Le ombre degli omini restano un poco indietro, il resto è fermo.
+function OmbrePigre() {
+  const { gl } = useThree();
+  const ultimo = useRef(-1);
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = false;
+    gl.shadowMap.needsUpdate = true;
+    return () => {
+      gl.shadowMap.autoUpdate = true;
+    };
+  }, [gl]);
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    if (t - ultimo.current < 0.25 && t >= ultimo.current) return;
+    ultimo.current = t;
+    gl.shadowMap.needsUpdate = true;
+  });
+  return null;
+}
 
 export function Luci({ ridotto }: { ridotto: boolean }) {
   const sole = useRef<THREE.DirectionalLight>(null!);
@@ -51,6 +73,7 @@ export function Luci({ ridotto }: { ridotto: boolean }) {
   }, [ridotto]);
   return (
     <>
+      {ridotto && <OmbrePigre />}
       <hemisphereLight args={['#eef3f8', '#dcdcda', 0.72]} />
       <directionalLight
         ref={sole}

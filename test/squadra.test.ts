@@ -10,7 +10,7 @@ import { inMarkdown } from '../motore/markdown.ts';
 import { Annullato, ErroreAgente } from '../motore/processo.ts';
 import type { Operai } from '../motore/produzione.ts';
 import { incarichiDi } from '../motore/prompt.ts';
-import { catalogoAssistenti, leggiFrontmatterAgente, leggiStatistiche, livello, procedure } from '../motore/squadra.ts';
+import { catalogoAssistenti, leggiFrontmatterAgente, leggiStatistiche, livello, procedure, senzaEsempi, squadraConStatistiche, titolo } from '../motore/squadra.ts';
 import type { Agente, Corrente, Evento, Incarico } from '../motore/tipi.ts';
 
 type Op = Parameters<ChiamaAgente>[0];
@@ -200,6 +200,84 @@ test('livelli: dieci, con soglie fisse', () => {
   assert.equal(livello(3599).livello, 9);
   assert.deepEqual(livello(5000), { livello: 10, xp: 5000, base: 3600, prossimo: null });
   assert.equal(livello(-5).xp, 0);
+});
+
+test('titoli: uno ogni due livelli', () => {
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(titolo), [
+    'Apprendista', 'Apprendista', 'Operativo', 'Operativo', 'Esperto', 'Esperto', 'Veterano', 'Veterano', 'Leggenda', 'Leggenda',
+  ]);
+  assert.equal(titolo(0), 'Apprendista');
+  assert.equal(titolo(99), 'Leggenda');
+});
+
+test('badge: calcolati dalle statistiche, "il più chiamato" sulla squadra intera, i collaudi solo per chi costruisce', () => {
+  const dati = mkdtempSync(join(tmpdir(), 'debate-badge-'));
+  const st = (x: Partial<Record<'xp' | 'incarichi' | 'completati' | 'falliti' | 'pacchetti' | 'approvati', number>>) =>
+    ({ xp: 0, incarichi: 0, completati: 0, falliti: 0, pacchetti: 0, approvati: 0, ...x });
+  writeFileSync(join(dati, 'squadra.json'), JSON.stringify({
+    // 30 lavori finiti, 28 riusciti: 93%. 26 rapporti (28 completati meno 2 pacchetti). Livello 5 con 900 XP.
+    ricerca: st({ xp: 900, incarichi: 52, completati: 28, falliti: 2, pacchetti: 2 }),
+    // 10 rapporti esatti, ma 10 riusciti su 13: 77%, non affidabile.
+    analisi: st({ xp: 200, incarichi: 11, completati: 10, falliti: 3 }),
+    // Costruisce: 6 pacchetti, 5 passati al collaudo; 6 lavori soli, troppo pochi per "affidabile".
+    sviluppo: st({ xp: 330, incarichi: 52, completati: 6, pacchetti: 6, approvati: 5 }),
+  }));
+  const m = new Map(squadraConStatistiche(dati, catalogoAssistenti(null)).map((x) => [x.id, x]));
+  const presi = (id: string) => m.get(id)!.badge.filter((b) => b.preso).map((b) => b.id);
+  const tutti = (id: string) => m.get(id)!.badge.map((b) => b.id);
+
+  assert.deepEqual(presi('ricerca'), ['prima-consegna', 'rapporti-10', 'rapporti-25', 'affidabile', 'instancabile', 'livello-5', 'piu-chiamato']);
+  assert.equal(m.get('ricerca')!.titolo, 'Esperto');
+  assert.deepEqual(presi('analisi'), ['prima-consegna', 'rapporti-10']);
+  assert.deepEqual(presi('sviluppo'), ['prima-consegna', 'collaudo', 'collaudi-5', 'instancabile', 'piu-chiamato']);
+  assert.equal(m.get('sviluppo')!.titolo, 'Operativo');
+  // Chi non costruisce pacchetti non vede i badge del collaudo: non li potrebbe mai prendere.
+  assert.ok(!tutti('ricerca').includes('collaudo'));
+  assert.ok(tutti('sviluppo').includes('collaudi-5'));
+  // Chi non ha mai lavorato: tutti spenti, ma ci sono (si vede cosa manca), con nome, icona e regola.
+  const nadia = m.get('controllo')!;
+  assert.equal(nadia.titolo, 'Apprendista');
+  assert.ok(nadia.badge.length >= 7 && nadia.badge.every((b) => !b.preso && b.nome && b.icona && b.regola));
+});
+
+test('badge "Affidabile": la stessa riuscita arrotondata che mostra la scheda (26 su 29 si legge 90%)', () => {
+  const dati = mkdtempSync(join(tmpdir(), 'debate-badge-'));
+  const st = (completati: number, falliti: number) => ({ xp: 0, incarichi: completati + falliti, completati, falliti, pacchetti: 0, approvati: 0 });
+  writeFileSync(join(dati, 'squadra.json'), JSON.stringify({ ricerca: st(26, 3), analisi: st(25, 3), architettura: st(9, 0) }));
+  const m = new Map(squadraConStatistiche(dati, catalogoAssistenti(null)).map((x) => [x.id, x]));
+  const affidabile = (id: string) => m.get(id)!.badge.find((b) => b.id === 'affidabile')!.preso;
+  assert.equal(m.get('ricerca')!.riuscita, 90);
+  assert.equal(affidabile('ricerca'), true, '89,7% si legge 90%: il badge si accende');
+  assert.equal(m.get('analisi')!.riuscita, 89);
+  assert.equal(affidabile('analisi'), false);
+  assert.equal(m.get('architettura')!.riuscita, 100);
+  assert.equal(affidabile('architettura'), false, 'meno di 10 lavori');
+});
+
+test('agente nel formato di /agents di Claude Code: niente escape né esempi nella scheda, gli esempi restano per il prompt', () => {
+  const agenti = mkdtempSync(join(tmpdir(), 'debate-agenti-'));
+  // Su una riga sola, con "\n" e "\"" scritti come testo, come la salva Claude Code.
+  const descrizione = 'Use this agent when you need a thorough review of freshly written code. It also checks \\"edge cases\\". Examples:\\n\\n<example>\\nContext: The user has just implemented a new feature.\\nuser: \\"I\'ve added the login endpoint\\"\\nassistant: \\"I\'ll use the code-reviewer agent\\"\\n<commentary>\\nFresh code: review it.\\n</commentary>\\n</example>\\n\\n<example>\\nContext: Another case.\\n</example>';
+  writeFileSync(join(agenti, 'code-reviewer.md'), `---\nname: code-reviewer\ndescription: ${descrizione}\ntools: Read, Grep\n---\nReview the code.\n`);
+  const catalogo = catalogoAssistenti(agenti);
+  const a = catalogo[0]!;
+  assert.equal(a.id, 'code-reviewer');
+  assert.doesNotMatch(a.descrizione, /\\/, 'niente escape letterali');
+  assert.match(a.descrizione, /It also checks "edge cases"\. Examples: <example> Context: The user has just implemented/, 'per il prompt gli esempi restano, su una riga');
+  assert.match(a.ruolo, /^Use this agent when you need a thorough review/);
+  assert.ok(a.skill.length > 0 && a.skill.every((k) => !/[<\\]|Context|Examples/.test(k.nome)), JSON.stringify(a.skill));
+
+  const scheda = squadraConStatistiche(mkdtempSync(join(tmpdir(), 'debate-badge-')), catalogo).find((x) => x.id === 'code-reviewer')!;
+  assert.equal(scheda.descrizione, 'Use this agent when you need a thorough review of freshly written code. It also checks "edge cases".');
+  // Un esempio tagliato a metà dal limite di lunghezza si toglie fino in fondo.
+  assert.equal(senzaEsempi('Rivede il codice. Examples: <example> Context: tagliato…'), 'Rivede il codice.');
+  assert.equal(senzaEsempi('Rivede il codice, per esempio un modulo nuovo.'), 'Rivede il codice, per esempio un modulo nuovo.');
+});
+
+test('badge: con nessuno chiamato non c\'è un "più chiamato"', () => {
+  const dati = mkdtempSync(join(tmpdir(), 'debate-badge-'));
+  const squadra = squadraConStatistiche(dati, catalogoAssistenti(null));
+  assert.ok(squadra.every((x) => x.badge.every((b) => !b.preso)));
 });
 
 test('produzione a pacchetti: due assistenti in ordine nello stesso cantiere, XP con il collaudo superato', async () => {

@@ -10,7 +10,8 @@ import { clone as cloneScheletro } from 'three/addons/utils/SkeletonUtils.js';
 import { temaScena } from './Modello.tsx';
 import { ripresa, type Punto } from './pianta.ts';
 
-export type Posa = 'fermo' | 'seduto' | 'scrive' | 'pensa' | 'consulta' | 'parla' | 'parla_seduto' | 'festeggia' | 'stretta' | 'errore' | 'spallucce' | 'porta' | 'lancia';
+// lavora: in piedi a un banco (il collaudo), con le mani sulla tastiera.
+export type Posa = 'fermo' | 'seduto' | 'scrive' | 'pensa' | 'consulta' | 'parla' | 'parla_seduto' | 'festeggia' | 'stretta' | 'errore' | 'spallucce' | 'porta' | 'lancia' | 'lavora';
 
 export type ModelloPersonaggio = 'female-d' | 'male-f' | 'male-d' | 'worker' | 'male-b' | 'female-b' | 'male-e' | 'female-e' | 'male-a' | 'female-f';
 const url = (m: ModelloPersonaggio) => `/modelli/personaggi/character-${m}.glb`;
@@ -32,6 +33,12 @@ export interface PropsPersonaggio {
   nome?: string;
   ciclico?: boolean; // rifà il percorso all'infinito (comparse)
   onArrivo?: () => void; // chiamato quando arriva a destinazione dopo aver camminato
+  // Grafica ridotta: da fermo e in una posa tranquilla l'animazione si aggiorna 15 volte al secondo
+  // invece che a ogni fotogramma (le ossa costano CPU, e lo schermo del telefono è piccolo).
+  economico?: boolean;
+  // Il colore dell'assistente (lo stesso dell'avatar e del cartellino): una pallina su un'antenna in
+  // testa, così l'omino grigio del plastico si riconosce.
+  colore?: string;
 }
 
 // Clip del pacchetto per ogni posa.
@@ -50,6 +57,7 @@ const CLIP: Record<Posa | 'cammina', string> = {
   spallucce: 'emote-no',
   porta: 'idle',
   lancia: 'interact-right',
+  lavora: 'idle',
 };
 const SEDUTE = new Set<Posa>(['seduto', 'scrive', 'pensa', 'consulta', 'parla_seduto']);
 // Gesti che si fanno una volta e poi si tengono: in loop la stretta di mano non finiva mai.
@@ -64,6 +72,10 @@ function angolo(da: number, a: number, lambda: number, dt: number): number {
 }
 
 const CARTONE = new THREE.MeshStandardMaterial({ color: '#b5f900', roughness: 0.7 });
+// L'antenna: misure nelle unità del modello (la testa comincia a 0,34 e finisce a circa 0,33 sopra).
+const ASTA = new THREE.CylinderGeometry(0.008, 0.008, 0.09, 6);
+const PALLA = new THREE.SphereGeometry(0.036, 12, 8);
+const NERO_ASTA = new THREE.MeshStandardMaterial({ color: '#141518', roughness: 0.5 });
 
 export function Personaggio(p: PropsPersonaggio) {
   const { scene, animations } = useGLTF(url(p.modello));
@@ -98,7 +110,25 @@ export function Personaggio(p: PropsPersonaggio) {
     mixer.uncacheRoot(rig);
   }, [mixer, rig]);
 
-  const stato = useRef({ x: p.inizio[0], z: p.inizio[1], verso: p.destinazione.verso, coda: [] as Punto[], fase: Math.random() * 10, inViaggio: false, clip: '' });
+  useEffect(() => {
+    const testa = ossa.testa;
+    if (!p.colore || !testa) return;
+    const materiale = new THREE.MeshStandardMaterial({ color: p.colore, roughness: 0.45, emissive: p.colore, emissiveIntensity: 0.25 });
+    const g = new THREE.Group();
+    const asta = new THREE.Mesh(ASTA, NERO_ASTA);
+    asta.position.y = 0.37;
+    const palla = new THREE.Mesh(PALLA, materiale);
+    palla.position.y = 0.43;
+    palla.castShadow = true;
+    g.add(asta, palla);
+    testa.add(g);
+    return () => {
+      testa.remove(g);
+      materiale.dispose();
+    };
+  }, [p.colore, ossa.testa]);
+
+  const stato = useRef({ x: p.inizio[0], z: p.inizio[1], verso: p.destinazione.verso, coda: [] as Punto[], fase: Math.random() * 10, inViaggio: false, clip: '', accumulo: 0 });
 
   // Un percorso nuovo fa ripartire la camminata, dal tratto più vicino a dove si trova.
   useEffect(() => {
@@ -106,7 +136,8 @@ export function Personaggio(p: PropsPersonaggio) {
     const punti = [...p.percorso, p.destinazione.punto];
     st.coda = p.ciclico ? punti : punti.slice(ripresa([st.x, st.z], punti));
     st.inViaggio = true;
-  }, [p.percorso, p.destinazione.punto, p.ciclico]);
+    // Le coordinate, non l'array: chi passa un punto nuovo a ogni giro non fa ripartire la camminata.
+  }, [p.percorso, p.destinazione.punto[0], p.destinazione.punto[1], p.ciclico]); // eslint-disable-line react-hooks/exhaustive-deps
   const arrivo = useRef(p.onArrivo);
   arrivo.current = p.onArrivo;
 
@@ -157,10 +188,15 @@ export function Personaggio(p: PropsPersonaggio) {
     }
     const camminata = azioni.walk;
     if (camminata) camminata.timeScale = vel / 1.6;
+    const tranquillo = p.economico && !inMoto && (p.posa === 'seduto' || p.posa === 'fermo');
+    st.accumulo += dt;
+    if (tranquillo && st.accumulo < 1 / 15) return;
+    const passo = st.accumulo;
+    st.accumulo = 0;
     // La clip "sit" non muove la testa: si azzera prima, così la clip la anima se la anima, e una
     // testa piegata da una posa di prima non resta piegata.
     if (ossa.testa) ossa.testa.rotation.set(0, 0, 0);
-    mixer.update(dt);
+    mixer.update(passo);
 
     // Pose che il pacchetto non ha: si muovono le braccia sopra la clip.
     const posa: Posa = inMoto ? (p.posa === 'porta' ? 'porta' : 'fermo') : p.posa;
@@ -186,6 +222,11 @@ export function Personaggio(p: PropsPersonaggio) {
       destro.rotation.x = -1 + Math.sin(t * 3.2) * 0.35;
       destro.rotation.z = -0.25;
       if (testa) testa.rotation.y = Math.sin(t * 1.3) * 0.25;
+    } else if (posa === 'lavora' && sinistro && destro) {
+      // In piedi al banco: braccia avanti sulla tastiera, testa china sullo schermo.
+      sinistro.rotation.x = -0.95 + Math.sin(t * 16) * 0.08;
+      destro.rotation.x = -0.95 + Math.sin(t * 16 + 1.7) * 0.08;
+      if (testa) testa.rotation.x = 0.22;
     } else if (posa === 'porta' && sinistro && destro) {
       sinistro.rotation.x = -1.2;
       destro.rotation.x = -1.2;

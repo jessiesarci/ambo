@@ -2,10 +2,10 @@
 // (o chi sceglie), e intanto si vede cosa stanno facendo: chi pensa, chi cerca nelle note, chi scrive.
 // Da qui una conversazione diventa un compito (una partita e poi la produzione).
 import {
-  ArrowUpRight, Box, Check, ChevronDown, Copy, Cpu, Ellipsis, Factory, FolderLock, ListChecks, LoaderCircle, Menu, MessageSquare, Mic,
-  NotebookPen, Pause, Play, Plus, RotateCcw, SendHorizontal, Volume2, VolumeX, X,
+  ArrowUpRight, Box, Check, ChevronDown, ChevronRight, Copy, Cpu, Ellipsis, Factory, FolderLock, ListChecks, LoaderCircle, Menu, MessageSquare, Mic,
+  NotebookPen, Pause, Play, Plus, RotateCcw, SendHorizontal, Timer, Volume2, VolumeX, X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { NOME, nomeAutore, type Agente, type Destinatari, type Dibattito, type MessaggioChat } from '../../../motore/tipi.ts';
 import { api, type Accessi, type Info, type Riassunto } from '../api.ts';
 import { Finestra } from '../hud/Comandi.tsx';
@@ -65,7 +65,12 @@ function Pallino({ agente, vivo }: { agente: Agente; vivo?: boolean }) {
   );
 }
 
-// La riga in alto: cosa stanno facendo adesso. Toccandola si apre il diario.
+// La riga in alto: cosa stanno facendo adesso. Toccandola si apre il diario. Da liberi basta il nome;
+// chi lavora diventa scuro e dice cosa fa. Nella testata chiede almeno 15rem (chi lavora con il suo
+// tempo più l'altro): se accanto il riassunto dei lavori non ci sta, quello va a capo invece di
+// schiacciare le pillole una sopra l'altra. "Risponde dopo" e "Errore" si leggono interi da 20rem
+// in su (la pillola non si stringe); sotto diventano un'icona: tagliati a una lettera ("Codex R")
+// sembravano un difetto.
 function StatoAgenti({ vista, coda, onDiario, diarioAperto }: { vista: Vista; coda: Agente[]; onDiario: () => void; diarioAperto: boolean }) {
   const [, setTic] = useState(0);
   useEffect(() => {
@@ -74,21 +79,33 @@ function StatoAgenti({ vista, coda, onDiario, diarioAperto }: { vista: Vista; co
     return () => clearInterval(t);
   }, [vista.parlante]);
   return (
-    <button className="flex w-full items-stretch gap-2 text-left" onClick={onDiario} aria-expanded={diarioAperto}>
+    <button className="@container flex min-w-0 flex-[1_1_15rem] items-center gap-1.5 text-left" onClick={onDiario} aria-expanded={diarioAperto}>
       <span className="sr-only">Apri il diario: </span>
       {AGENTI.map((a) => {
         const s = statoAgente(vista, a, coda);
+        const libero = s.testo === 'Libero';
+        // Le pillole che si stringono tengono almeno pallino, nome (e tempo) e tagliano il resto
+        // dentro di sé: prima il contenuto usciva e finiva sotto la pillola accanto. Chi lavora parte
+        // dalla sua larghezza (flex-auto), così nello spazio stretto cede in proporzione con "Risponde
+        // dopo" invece di restare al minimo.
         return (
-          <span key={a} className={`flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-2.5 py-1.5 ${s.vivo ? 'border-[#141518] bg-[#141518] text-white' : 'border-bordo bg-cartaScura text-inchiostro'}`}>
+          <span key={a} className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-[12px] leading-none ${s.vivo ? 'min-w-[7.5rem] flex-auto overflow-hidden bg-[#141518] text-white' : libero ? 'shrink-0 bg-cartaScura text-inchiostro' : 'shrink-0 bg-cartaScura text-inchiostro'}`} title={libero ? undefined : s.testo}>
             <Pallino agente={a} vivo={s.vivo} />
-            <span className="min-w-0 flex-1">
-              <span className="block font-titolo text-[12px] font-bold leading-tight">{NOME[a]}{vista.parlante === a && vista.inizioTurno ? <span className="ml-1 font-dati text-[10px] font-normal opacity-70">{durata(Date.now() - vista.inizioTurno)}</span> : null}</span>
-              <span className={`block truncate text-[11.5px] leading-tight ${s.vivo ? 'text-[#d9dce0]' : 'text-grafite'}`}>{s.testo}</span>
-            </span>
+            <span className="shrink-0 font-titolo font-bold">{NOME[a]}</span>
+            {vista.parlante === a && vista.inizioTurno ? <span className="shrink-0 font-dati text-[10px] opacity-70">{durata(Date.now() - vista.inizioTurno)}</span> : null}
+            {libero ? <span className="sr-only">libero</span>
+              : s.vivo ? <span className="min-w-0 truncate text-[#d9dce0]">{s.testo}</span>
+              : <>
+                <span className="hidden whitespace-nowrap text-grafite @min-[20rem]:inline">{coda.includes(a) ? s.testo : 'Errore'}</span>
+                <span className="sr-only @min-[20rem]:hidden">{s.testo}</span>
+                {coda.includes(a)
+                  ? <Timer size={12} className="shrink-0 text-grafite @min-[20rem]:hidden" aria-hidden />
+                  : <X size={12} className="shrink-0 text-grafite @min-[20rem]:hidden" aria-hidden />}
+              </>}
           </span>
         );
       })}
-      <ChevronDown size={16} className={`self-center text-grafite transition-transform ${diarioAperto ? 'rotate-180' : ''}`} aria-hidden />
+      <ChevronDown size={14} className={`shrink-0 text-grafite transition-transform ${diarioAperto ? 'rotate-180' : ''}`} aria-hidden />
     </button>
   );
 }
@@ -206,24 +223,45 @@ function SchedaCompito({ chat, m, messaggi, partite, disabilitato, onApri }: {
   );
 }
 
-// Cosa lavora adesso fuori dalla chat, e cosa aspetta una decisione: in cinque secondi si vede.
-function Lavori({ partite, onApri }: { partite: Riassunto[]; onApri: (id: string) => void }) {
+// Cosa lavora adesso fuori dalla chat e cosa aspetta una decisione: di serie una riga
+// sola ("3 da decidere · 1 al lavoro"), l'elenco si apre a richiesta.
+type VoceLavori = { r: Riassunto; attivo: boolean; aspetta: boolean };
+function lavoriDellaChat(partite: Riassunto[]): VoceLavori[] {
   const giorno = Date.now() - 24 * 3600_000;
-  const voci = partite.map((r) => {
+  return partite.map((r) => {
     const attivo = r.inCorso || r.stato === 'in_corso' || r.stato === 'sintesi' || r.produzione === 'in_lavorazione' || r.produzione === 'collaudo';
     const aspetta = !attivo && new Date(r.aggiornato).getTime() > giorno
       && (r.stato === 'errore' || r.stato === 'in_pausa' || (r.stato === 'concluso' && !r.produzione) || r.produzione === 'errore' || (r.produzione === 'pronta' && r.collaudo === false));
     return { r, attivo, aspetta };
-  }).filter((x) => x.attivo || x.aspetta).slice(0, 4);
+  }).filter((x) => x.attivo || x.aspetta)
+    // Prima quello che aspetta una decisione, poi quello che lavora: l'ordine dell'archivio resta dentro.
+    .sort((a, b) => Number(b.aspetta) - Number(a.aspetta));
+}
+
+function RiassuntoLavori({ voci, aperto, onApri }: { voci: VoceLavori[]; aperto: boolean; onApri: () => void }) {
   if (!voci.length) return null;
+  const decidere = voci.filter((x) => x.aspetta).length;
+  const lavoro = voci.length - decidere;
   return (
-    <ul className="mt-1.5 space-y-1 border-t border-bordo pt-1.5" aria-label="Lavori">
+    <button className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[12px] leading-none ${aperto ? 'border-[#141518] bg-white' : 'border-bordo bg-white hover:border-[#c4c8ce]'}`} onClick={onApri} aria-expanded={aperto} aria-controls="lavori-chat">
+      {lavoro > 0 && <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-[#b5f900] ring-1 ring-[#141518]" aria-hidden />}
+      <span className="font-titolo font-semibold">{[decidere ? `${decidere} da decidere` : '', lavoro ? `${lavoro} al lavoro` : ''].filter(Boolean).join(' · ')}</span>
+      <ChevronRight size={13} className={`shrink-0 text-grafite transition-transform ${aperto ? 'rotate-90' : ''}`} aria-hidden />
+    </button>
+  );
+}
+
+function Lavori({ voci, onApri }: { voci: VoceLavori[]; onApri: (id: string) => void }) {
+  return (
+    <ul id="lavori-chat" className="scorri mt-1.5 max-h-52 space-y-0.5 overflow-y-auto border-t border-bordo pt-1.5" aria-label="Lavori">
       {voci.map(({ r, attivo }) => (
         <li key={r.id}>
-          <button className="flex w-full items-center gap-2 rounded-lg px-1 py-0.5 text-left text-[12px] hover:bg-cartaScura" onClick={() => onApri(r.id)}>
+          <button className="flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left text-[12.5px] hover:bg-cartaScura" onClick={() => onApri(r.id)}>
             <span className={`h-2 w-2 shrink-0 rounded-full ${attivo ? 'animate-pulse bg-[#b5f900] ring-1 ring-[#141518]' : 'bg-[#141518]'}`} aria-hidden />
-            <span className="w-16 shrink-0 font-dati text-[10.5px] uppercase text-grafite">{attivo ? 'Al lavoro' : 'Decidi tu'}</span>
-            <span className="min-w-0 flex-1 truncate"><b className="font-semibold">{r.domanda}</b> · {statoPartita(r)}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold">{r.domanda}</span>
+              <span className="block truncate text-[11.5px] text-grafite">{attivo ? 'Al lavoro' : 'Da decidere'} · {statoPartita(r)}</span>
+            </span>
             <ArrowUpRight size={13} className="shrink-0 text-grafite" aria-hidden />
           </button>
         </li>
@@ -233,24 +271,36 @@ function Lavori({ partite, onApri }: { partite: Riassunto[]; onApri: (id: string
 }
 
 // Un fatto del programma scritto in chat dal motore: partita avviata, conclusa, produzione pronta.
-function BollaMotore({ m, partite, onApri }: { m: MessaggioChat; partite: Riassunto[]; onApri: (id: string) => void }) {
+// Di serie la prima frase su una riga; un tocco mostra il testo intero.
+const primaFrase = (t: string) => t.split(/(?<=[.:»])\s+(?=[A-ZÀ-Ý])/)[0] ?? t;
+
+function BollaMotore({ m, onApri }: { m: MessaggioChat; onApri: (id: string) => void }) {
   const id = m.evento?.partita;
-  const r = id ? partite.find((x) => x.id === id) : undefined;
+  const [tutto, setTutto] = useState(false);
+  const prima = primaFrase(m.testo);
+  const lungo = prima.length < m.testo.length;
   return (
-    <div className="flex items-start gap-2 rounded-xl border border-dashed border-[#c4c8ce] bg-white/80 px-3 py-2 text-[13px] leading-snug">
-      <Cpu size={14} className="mt-0.5 shrink-0 text-grafite" aria-hidden />
-      <div className="min-w-0 flex-1">
-        <p className="break-words">{m.testo}</p>
-        <p className="mt-0.5 font-dati text-[10.5px] text-grafite">Motore · {ora(m.ora)}{r ? ` · adesso: ${statoPartita(r)}` : ''}</p>
-      </div>
-      {id && <button className="shrink-0 rounded-lg px-1.5 py-0.5 text-[12.5px] font-semibold underline decoration-[#b5f900] decoration-2" onClick={() => onApri(id)}>Apri</button>}
+    <div className="flex items-start gap-2 px-1 text-[12.5px] leading-snug text-grafite">
+      <Cpu size={13} className="mt-[3px] shrink-0" aria-hidden />
+      {lungo
+        ? <button className={`min-w-0 flex-1 text-left text-inchiostro ${tutto ? 'break-words' : 'truncate'}`} onClick={() => setTutto(!tutto)} aria-expanded={tutto}>{tutto ? m.testo : prima}</button>
+        : <p className="min-w-0 flex-1 break-words text-inchiostro">{m.testo}</p>}
+      <span className="mt-px shrink-0 font-dati text-[10.5px]">{ora(m.ora)}</span>
+      {id && <button className="shrink-0 rounded-lg px-1 text-[12.5px] font-semibold text-inchiostro underline decoration-[#b5f900] decoration-2" onClick={() => onApri(id)}>Apri</button>}
     </div>
   );
 }
 
-function BollaAgente({ m, leggendo, onLeggi, scheda }: { m: MessaggioChat; leggendo: boolean; onLeggi: () => void; scheda?: ReactNode }) {
+// Tempi e token si vedono con un tocco sulla risposta, o sempre se lo si sceglie dal menu.
+function BollaAgente({ m, leggendo, onLeggi, scheda, dettagli }: { m: MessaggioChat; leggendo: boolean; onLeggi: () => void; scheda?: ReactNode; dettagli: boolean }) {
   const agente = m.autore as Agente;
   const [copiato, setCopiato] = useState(false);
+  const [aperta, setAperta] = useState(false);
+  // Un tocco sul testo (non su un link, un tasto o una selezione) mostra o nasconde i numeri.
+  const tocco = (e: MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('a, button, input, textarea, select') || window.getSelection()?.toString()) return;
+    setAperta((x) => !x);
+  };
   if (m.passa) {
     return (
       <div className="flex items-center gap-2 pl-1 text-[12px] text-grafite">
@@ -261,15 +311,15 @@ function BollaAgente({ m, leggendo, onLeggi, scheda }: { m: MessaggioChat; legge
   const c = m.chiamata;
   return (
     <div className="flex">
-      <div className="max-w-[92%] rounded-2xl rounded-bl-md border border-bordo bg-white px-3.5 py-2.5 shadow-[0_1px_0_#e2e4e8]">
+      <div className="max-w-[92%] rounded-2xl rounded-bl-md border border-bordo bg-white px-3.5 pb-1 pt-2.5 shadow-[0_1px_0_#e2e4e8]" onClick={tocco}>
         <div className="mb-1 flex items-center gap-1.5 font-titolo text-[12.5px] font-bold">
           <Pallino agente={agente} /> {NOME[agente]}
           <span className="font-dati text-[10.5px] font-normal text-grafite">{ora(m.ora)}</span>
         </div>
         {m.testo && <div className="text-[15px] [&_.md]:text-[15px]"><TestoMd testo={m.testo} /></div>}
         {scheda}
-        <div className="mt-1 flex items-center gap-1 text-grafite">
-          {c && <span className="mr-auto font-dati text-[10.5px]" title={`${c.modello} · ${c.uso.ingresso} token in ingresso (${c.uso.inCache} dalla cache) · ${c.uso.uscita} in uscita`}>{c.secondi.toFixed(0)} s · {migliaia(c.uso.ingresso)} in · {migliaia(c.uso.uscita)} out</span>}
+        <div className="flex items-center justify-end gap-0.5 text-grafite">
+          {c && (dettagli || aperta) && <span className="mr-auto font-dati text-[10.5px]" title={`${c.modello} · ${c.uso.ingresso} token in ingresso (${c.uso.inCache} dalla cache) · ${c.uso.uscita} in uscita`}>{c.secondi.toFixed(0)} s · {migliaia(c.uso.ingresso)} in · {migliaia(c.uso.uscita)} out</span>}
           <button className="rounded-lg p-1.5 hover:bg-cartaScura" onClick={() => void navigator.clipboard?.writeText(m.testo).then(() => { setCopiato(true); setTimeout(() => setCopiato(false), 1500); })} aria-label="Copia la risposta">
             {copiato ? <Check size={15} /> : <Copy size={15} />}
           </button>
@@ -348,11 +398,11 @@ function usaCampo(modoVoce: ModoVoce, voceSulPc: boolean, onInvia: (testo: strin
     }
   };
   // Senza la trascrizione sul PC non si passa da soli alla dettatura del browser: quella manda la
-  // voce a Google o Apple, e la scelta si fa dal menu.
+  // voce al servizio di chi fa il browser, e la scelta si fa dal menu.
   const avviaVoce = () => {
     if (modoVoce === 'pc' && !voceSulPc) {
       setAvvisoVoce(puoDettare()
-        ? 'La trascrizione sul PC non è installata (npm run voce:installa). Dal menu ⋯ puoi usare la dettatura del browser, che passa da Google o Apple.'
+        ? 'La trascrizione sul PC non è installata (npm run voce:installa). Dal menu ⋯ puoi usare la dettatura del browser, che passa dal servizio di chi fa il browser.'
         : 'La trascrizione sul PC non è installata, e questo browser non ha la dettatura.');
       return;
     }
@@ -605,6 +655,9 @@ export function Chat(p: PropsChat) {
   const [elenco, setElenco] = useState(false);
   const [menu, setMenu] = useState(false);
   const [diario, setDiario] = useState(false);
+  const [lavoriAperti, setLavoriAperti] = useState(false);
+  // Tempi e token sotto ogni risposta: nascosti di serie, sempre visibili a scelta.
+  const [dettagli, setDettagli] = preferenza<'si' | 'no'>('ambo.dettagli', 'no');
   const [compito, setCompito] = useState(false);
   const [errore, setErrore] = useState<string>();
   const [fatto, setFatto] = useState<string>();
@@ -621,8 +674,8 @@ export function Chat(p: PropsChat) {
     if (idPrima.current) { setErrore(undefined); setInInvio(undefined); setDiario(false); }
     idPrima.current = p.id;
   }, [p.id]);
-  // La trascrizione sul PC c'è solo se è installata. La dettatura del browser (Google o
-  // Apple) si sceglie dal menu: non ci si passa da soli.
+  // La trascrizione sul PC c'è solo se è installata. La dettatura del browser (servizio di chi
+  // fa il browser) si sceglie dal menu: non ci si passa da soli.
   const voceSulPc = p.info?.voce?.disponibile !== false;
   const modo: ModoVoce = modoVoce;
 
@@ -698,6 +751,7 @@ export function Chat(p: PropsChat) {
   };
 
   const campo = usaCampo(modo, voceSulPc, invia);
+  const lavori = useMemo(() => lavoriDellaChat(p.partite), [p.partite]);
   const vuota = !messaggi.length && !inInvio;
   const ultimaRisposta = messaggi.findLast((m) => m.autore !== 'utente' && !m.passa);
   const scheda = (m: MessaggioChat) => (m.proposta && d
@@ -716,7 +770,7 @@ export function Chat(p: PropsChat) {
         {p.vista.parlante && p.vista.ruolo === 'chat' ? (
           <div className="max-h-28 overflow-hidden text-[13.5px] text-grafite [mask-image:linear-gradient(#000_60%,transparent)]">{p.vista.testoParziale || '…'}</div>
         ) : ultimaRisposta ? (
-          <button className="line-clamp-3 text-left text-[13.5px] text-grafite" onClick={p.onChat}><b className="text-inchiostro">{nomeAutore(ultimaRisposta.autore)}:</b> {ultimaRisposta.testo || ultimaRisposta.proposta?.titolo}</button>
+          <button className="line-clamp-3 text-left text-[13.5px] text-grafite" onClick={p.onChat}><b className="text-inchiostro">{nomeAutore(ultimaRisposta.autore)}:</b> {ultimaRisposta.autore === 'motore' ? primaFrase(ultimaRisposta.testo) : ultimaRisposta.testo || ultimaRisposta.proposta?.titolo}</button>
         ) : null}
         <Composer campo={campo} compatto disabilitato={disabilitato} occupato={occupato} modoVoce={modo} chi={chi} setChi={setChi} />
       </div>
@@ -725,11 +779,11 @@ export function Chat(p: PropsChat) {
 
   return (
     <section className="pointer-events-auto relative flex h-full w-full flex-col overflow-hidden bg-[#f7f8f9] md:rounded-2xl md:border md:border-bordo md:shadow-[0_12px_32px_rgba(10,12,16,0.14)]" aria-label="Chat con Claude e Codex">
-      <header className="flex items-center gap-1.5 border-b border-bordo bg-white px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+      <header className="flex items-center gap-1 bg-white px-1.5 pb-1 pt-[max(0.4rem,env(safe-area-inset-top))]">
         <button className="tasto tasto-icona !min-h-9 !border-transparent !shadow-none" onClick={() => setElenco(true)} aria-label="Le tue chat"><Menu size={20} /></button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-titolo text-[15px] font-bold leading-tight">{d?.config.domanda ?? 'Nuova chat'}</h1>
-          <p className="truncate text-[11.5px] text-grafite">{d ? `${quanti(messaggi.filter((m) => m.autore === 'utente').length, 'messaggio', 'messaggi')}${d.config.memoria === false ? ' · note spente' : haNote ? ' · con le tue note' : ''}` : 'Claude e Codex, sul tuo PC'}</p>
+          {d?.config.memoria === false && <p className="truncate text-[11.5px] text-grafite">Note spente</p>}
         </div>
         {p.onUfficio && <button className="tasto tasto-icona !min-h-9 md:hidden" onClick={p.onUfficio} aria-label="Guarda l'ufficio 3D"><Box size={18} /></button>}
         <div className="relative">
@@ -741,8 +795,9 @@ export function Chat(p: PropsChat) {
                 <Voce icona={<Plus size={16} />} onClick={() => { setMenu(false); p.onNuova(); }}>Nuova chat</Voce>
                 <Voce icona={<ListChecks size={16} />} onClick={() => { setMenu(false); setCompito(true); }} disabled={!d || !messaggi.length || !!disabilitato}>Trasforma in compito</Voce>
                 <Voce icona={<NotebookPen size={16} />} onClick={() => azione(async () => { const r = await api.salvaNota(d!.id); setFatto(`Salvata come nota: ${r.nota}`); })} disabled={!d || !messaggi.length || !!disabilitato}>Salva come nota</Voce>
+                <Voce icona={<Timer size={16} />} onClick={() => { setMenu(false); setDettagli(dettagli === 'si' ? 'no' : 'si'); }}>{dettagli === 'si' ? 'Nascondi tempi e token' : 'Mostra tempi e token'}</Voce>
                 {puoLeggere() && <Voce icona={leggiSempre === 'si' ? <VolumeX size={16} /> : <Volume2 size={16} />} onClick={() => { setMenu(false); setLeggiSempre(leggiSempre === 'si' ? 'no' : 'si'); if (leggiSempre === 'si') smettiDiLeggere(); }}>{leggiSempre === 'si' ? 'Non leggere più le risposte' : 'Leggi le risposte ad alta voce'}</Voce>}
-                {puoDettare() && <Voce icona={<Mic size={16} />} onClick={() => { setMenu(false); setModoVoce(modoVoce === 'pc' ? 'browser' : 'pc'); }}>{modoVoce === 'pc' ? 'Voce: dettatura del browser (passa da Google o Apple)' : 'Voce: trascrivi sul PC (resta sul PC, più precisa)'}</Voce>}
+                {puoDettare() && <Voce icona={<Mic size={16} />} onClick={() => { setMenu(false); setModoVoce(modoVoce === 'pc' ? 'browser' : 'pc'); }}>{modoVoce === 'pc' ? 'Voce: dettatura del browser (passa dal servizio del browser)' : 'Voce: trascrivi sul PC (resta sul PC, più precisa)'}</Voce>}
                 <Voce icona={<ListChecks size={16} />} onClick={() => { setMenu(false); p.onPartite(); }}>Partite e produzione</Voce>
                 {p.onCartelle && <Voce icona={<FolderLock size={16} />} onClick={() => { setMenu(false); p.onCartelle!(); }}>Cartelle autorizzate</Voce>}
               </div>
@@ -751,10 +806,13 @@ export function Chat(p: PropsChat) {
         </div>
       </header>
 
-      <div className="border-b border-bordo bg-white px-2 py-1.5">
-        <StatoAgenti vista={p.vista} coda={coda} onDiario={() => setDiario(!diario)} diarioAperto={diario} />
+      <div className="border-b border-bordo bg-white px-2 pb-2 pt-0.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <StatoAgenti vista={p.vista} coda={coda} onDiario={() => setDiario(!diario)} diarioAperto={diario} />
+          <RiassuntoLavori voci={lavori} aperto={lavoriAperti} onApri={() => setLavoriAperti(!lavoriAperti)} />
+        </div>
         {diario && <Diario voci={p.vista.diario} onScheda={p.onScheda} />}
-        <Lavori partite={p.partite} onApri={p.onPartita} />
+        {lavoriAperti && lavori.length > 0 && <Lavori voci={lavori} onApri={p.onPartita} />}
       </div>
 
       <div
@@ -783,8 +841,8 @@ export function Chat(p: PropsChat) {
             {messaggi.map((m) => (m.autore === 'utente'
               ? <BollaUtente key={m.indice} m={m} />
               : m.autore === 'motore'
-                ? <BollaMotore key={m.indice} m={m} partite={p.partite} onApri={p.onPartita} />
-                : <BollaAgente key={m.indice} m={m} leggendo={leggendo === m.indice} onLeggi={() => leggiQuesto(m)} scheda={scheda(m)} />))}
+                ? <BollaMotore key={m.indice} m={m} onApri={p.onPartita} />
+                : <BollaAgente key={m.indice} m={m} leggendo={leggendo === m.indice} onLeggi={() => leggiQuesto(m)} scheda={scheda(m)} dettagli={dettagli === 'si'} />))}
             {inInvio && <BollaUtente m={{ ...inInvio, ora: new Date().toISOString() }} inInvio />}
             {p.vista.parlante && p.vista.ruolo === 'chat' && <BollaDalVivo vista={p.vista} />}
             {coda.length > 0 && !p.vista.parlante && <div className="flex items-center gap-2 text-[12px] text-grafite"><Puntini /> {coda.map((a) => NOME[a]).join(' e ')} {coda.length > 1 ? 'stanno' : 'sta'} per rispondere</div>}

@@ -2,7 +2,7 @@
 // di misura, quindi qui si misura il modello e lo si porta alla dimensione voluta, appoggiato a
 // terra e centrato sul punto d'origine. Geometrie e materiali restano condivisi tra le copie.
 import { useGLTF } from '@react-three/drei';
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import * as THREE from 'three';
 
 type V3 = [number, number, number];
@@ -125,3 +125,50 @@ export function Modello({ url, larghezza, altezza, profondita, scala: scalaFissa
 }
 
 export const precarica = (urls: string[]) => urls.forEach((u) => useGLTF.preload(u));
+
+// Tante copie dello stesso mobile in un colpo solo: un InstancedMesh per ogni pezzo del modello,
+// quindi una chiamata di disegno per pezzo invece che una per copia (le scrivanie dei reparti sono
+// decine). Stessa resa di Modello: scala del kit, appoggiato a terra, centrato sul punto, tinte e tema.
+export interface Copia {
+  position: V3;
+  rotation?: number;
+}
+
+export function Istanze({ url, copie, scala, tinte, ombre = true }: { url: string; copie: readonly Copia[]; scala: number; tinte?: Record<string, string>; ombre?: boolean }) {
+  const { scene } = useGLTF(url);
+  if (tinte) tingi(scene, tinte);
+  temaScena(scene, tinte);
+  const firma = JSON.stringify(copie);
+  const istanze = useMemo(() => {
+    if (!copie.length) return [];
+    scene.updateMatrixWorld(true);
+    const b = misura(scene);
+    const centro = b.getCenter(new THREE.Vector3());
+    // Dal modello alla copia: sposta a terra e al centro, scala, ruota, porta al punto.
+    const base = new THREE.Matrix4().makeScale(scala, scala, scala).premultiply(new THREE.Matrix4().makeTranslation(-centro.x * scala, -b.min.y * scala, -centro.z * scala));
+    const posa = copie.map((c) => new THREE.Matrix4().makeRotationY(c.rotation ?? 0).premultiply(new THREE.Matrix4().makeTranslation(...c.position)).multiply(base));
+    const pezzi: THREE.Mesh[] = [];
+    scene.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) pezzi.push(o as THREE.Mesh);
+    });
+    const m = new THREE.Matrix4();
+    return pezzi.map((pezzo) => {
+      const im = new THREE.InstancedMesh(pezzo.geometry, pezzo.material, copie.length);
+      posa.forEach((p, i) => im.setMatrixAt(i, m.multiplyMatrices(p, pezzo.matrixWorld)));
+      im.instanceMatrix.needsUpdate = true;
+      im.castShadow = ombre;
+      im.receiveShadow = true;
+      im.computeBoundingSphere();
+      return im;
+    });
+  }, [scene, scala, ombre, firma]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Geometrie e materiali sono quelli del modello (condivisi): si libera solo il buffer delle copie.
+  useEffect(() => () => istanze.forEach((im) => im.dispose()), [istanze]);
+  return (
+    <>
+      {istanze.map((im, i) => (
+        <primitive key={i} object={im} />
+      ))}
+    </>
+  );
+}

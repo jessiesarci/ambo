@@ -92,12 +92,30 @@ export function TestoMd({ testo }: { testo: string }) {
 
 // Finestre modali: focus sul primo controllo, Esc per chiudere, Tab che resta dentro, e alla
 // chiusura il focus torna al tasto che le ha aperte.
-export function usaFinestra(onChiudi: () => void) {
+// Con modale = false (le schede sopra la scena, che lasciano usare il resto) restano Esc e il
+// ritorno del focus, ma Esc chiude solo il livello più alto: le modali ascoltano su document e
+// segnano il tasto con preventDefault, le schede ascoltano su window, che viene dopo, e lasciano
+// stare un Esc già usato. Il focus torna indietro solo se intanto non è andato altrove.
+export function usaFinestra(onChiudi: () => void, modale = true) {
   const pannello = useRef<HTMLDivElement>(null);
   const chiudi = useRef(onChiudi);
   chiudi.current = onChiudi;
   useEffect(() => {
     const prima = document.activeElement as HTMLElement | null;
+    if (!modale) {
+      const esc = (e: KeyboardEvent) => {
+        if (e.key !== 'Escape' || e.defaultPrevented) return;
+        e.preventDefault();
+        chiudi.current();
+      };
+      window.addEventListener('keydown', esc);
+      return () => {
+        window.removeEventListener('keydown', esc);
+        // Chiusa con la X o con Esc il focus è finito sul body: torna a chi l'ha aperta, se c'è ancora.
+        const ora = document.activeElement;
+        if (prima && prima !== document.body && prima.isConnected && (!ora || ora === document.body)) prima.focus({ preventScroll: true });
+      };
+    }
     const focalizzabili = () => [...(pannello.current?.querySelectorAll<HTMLElement>('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])') ?? [])].filter((e) => !e.hasAttribute('disabled'));
     const campo = pannello.current?.querySelector<HTMLElement>('textarea, input');
     (campo ?? focalizzabili()[0])?.focus();
@@ -123,7 +141,7 @@ export function usaFinestra(onChiudi: () => void) {
       document.removeEventListener('keydown', tasti);
       prima?.focus?.();
     };
-  }, []);
+  }, [modale]);
   return pannello;
 }
 

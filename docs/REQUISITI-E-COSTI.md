@@ -26,7 +26,7 @@ Serve la connessione a internet: le CLI parlano con i servizi di Anthropic e di 
 | faster-whisper | lo installa `npm run voce:installa` | In `dati/voce-venv` |
 | Modello di trascrizione | `small` (di serie) | Si scarica la prima volta che usi la voce, circa 500 MB. Gira su CPU |
 
-Senza Python puoi usare la dettatura del browser, che però passa dai servizi di Google o di Apple. La lettura ad alta voce delle risposte usa la sintesi vocale del browser con le voci installate sul PC: se il browser ha solo voci online, la lettura non c'è.
+Senza Python puoi usare la dettatura del browser, che però passa dal servizio vocale di chi fa il browser (per esempio Google con Chrome o Apple con Safari). La lettura ad alta voce delle risposte usa la sintesi vocale del browser con le voci installate sul PC: se il browser ha solo voci online, la lettura non c'è.
 
 ## Costi
 
@@ -72,7 +72,7 @@ Esempio reale, con la versione 0.1.0 (6 interventi, senza squadra):
 
 ### Dove vedere i token
 
-- Sotto ogni risposta in chat.
+- In chat, cliccando una risposta; con «Mostra tempi e token» nel menu ⋯ restano sempre visibili.
 - Nel documento finale di ogni partita.
 
 ### Come consumare meno

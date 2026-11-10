@@ -10,7 +10,7 @@ import { basename, join } from 'node:path';
 import { percorsoUtente, RADICE } from './ambiente.ts';
 import { riprova } from './archivio.ts';
 import type {
-  Assistente, FaseProcedura, LivelloAssistente, MembroSquadra, PacchettoPiano, Procedura, SkillAssistente, StatisticheAssistente,
+  Assistente, BadgeAssistente, FaseProcedura, LivelloAssistente, MembroSquadra, PacchettoPiano, Procedura, SkillAssistente, StatisticheAssistente,
 } from './tipi.ts';
 
 // Tetti interni: la quota è quella degli abbonamenti e ogni assistente è una chiamata in più.
@@ -174,6 +174,18 @@ const comeTesto = (c: Campo | undefined): string => (Array.isArray(c) ? c.join('
 const comeLista = (c: Campo | undefined): string[] => (Array.isArray(c) ? c : (c ?? '').split(',')).map((s) => s.trim()).filter(Boolean);
 const accorcia = (t: string, max: number): string => (t.length > max ? `${t.slice(0, max - 1).replace(/\s+\S*$/, '').trimEnd()}…` : t);
 
+// Il formato di /agents di Claude Code: la descrizione su una riga, con a capo e virgolette scritti
+// come escape ("\n", "\"") e in fondo gli esempi tra <example>…</example>.
+const senzaEscape = (t: string): string => t.replace(/\\([nrt"'\\])/g, (_, c: string) => ('nrt'.includes(c) ? ' ' : c)).replace(/\s+/g, ' ').trim();
+// Gli esempi servono al modello per scegliere l'agente e restano nel prompt della riunione; nella
+// scheda (e per ruolo e competenze) conta la frase che dice cosa fa. Un esempio tagliato a metà
+// dal limite di lunghezza si toglie fino in fondo.
+export const senzaEsempi = (t: string): string => t
+  .replace(/<example>[\s\S]*?(?:<\/example>|$)/gi, ' ')
+  .replace(/\s*\b(?:examples?|esempi|esempio)\s*:\s*$/i, '')
+  .replace(/\s+/g, ' ')
+  .trim();
+
 // Le skill di un agente dell'utente: i pezzi della descrizione, al massimo 5.
 function skillDaDescrizione(descrizione: string): SkillAssistente[] {
   return descrizione
@@ -196,17 +208,20 @@ export function leggiAgente(file: string): VoceCatalogo | undefined {
   const { campi, corpo } = leggiFrontmatterAgente(testo);
   const id = [comeTesto(campi.name), basename(file, '.md')].map((x) => x.toLowerCase().replace(/\s+/g, '-')).find((x) => ID.test(x));
   if (!id) return undefined;
-  const descrizione = comeTesto(campi.description) || `Agente ${id}`;
+  const descrizione = senzaEscape(comeTesto(campi.description)) || `Agente ${id}`;
+  const utile = senzaEsempi(descrizione) || descrizione;
   const strumenti = comeLista(campi.tools);
   const istruzioni = corpo.trim();
   return {
     id,
     nome: id,
-    ruolo: accorcia(descrizione.split(/\.\s/)[0]!.replace(/\.$/, ''), 60),
+    ruolo: accorcia(utile.split(/\.\s/)[0]!.replace(/\.$/, ''), 60),
     motore: 'claude',
     produzione: strumenti.some((s) => s === 'Write' || s === 'Edit' || s.startsWith('Write(') || s.startsWith('Edit(')),
-    descrizione: accorcia(descrizione, 200),
-    skill: skillDaDescrizione(descrizione),
+    // Intera: le descrizioni vere stanno sotto i 250 caratteri. Gli esempi restano qui per
+    // il prompt e si tolgono per la scheda in squadraConStatistiche.
+    descrizione: accorcia(descrizione, 600),
+    skill: skillDaDescrizione(utile),
     fonte: 'utente',
     istruzioni: istruzioni.length > MAX_ISTRUZIONI_AGENTE ? `${istruzioni.slice(0, MAX_ISTRUZIONI_AGENTE)}\n\n[…istruzioni tagliate dal motore]` : istruzioni,
   };
@@ -348,6 +363,58 @@ export function livello(xp: number): LivelloAssistente {
   return { livello: i + 1, xp: x, base: SOGLIE[i]!, prossimo: SOGLIE[i + 1] ?? null };
 }
 
+// --- titoli e badge ---------------------------------------------------------------------------
+
+// Un titolo ogni due livelli.
+const TITOLI = ['Apprendista', 'Operativo', 'Esperto', 'Veterano', 'Leggenda'] as const;
+export function titolo(liv: number): string {
+  const i = Math.min(TITOLI.length - 1, Math.max(0, Math.floor((Math.trunc(liv) - 1) / 2)));
+  return TITOLI[i]!;
+}
+
+// Quello che serve per decidere i badge: le statistiche di uno, più un fatto della squadra intera.
+interface ContoBadge {
+  s: StatisticheAssistente;
+  livello: number;
+  riuscita: number | null; // la percentuale arrotondata che mostra la scheda (riuscitaDi)
+  piuChiamato: boolean;
+}
+interface RegolaBadge {
+  id: string;
+  nome: string;
+  icona: string;
+  regola: string;
+  soloProduzione?: boolean; // i collaudi riguardano solo chi costruisce pacchetti
+  preso: (c: ContoBadge) => boolean;
+}
+
+// Rapporti: incarichi in riunione e revisioni consegnati. I pacchetti contano a parte.
+const rapporti = (s: StatisticheAssistente) => Math.max(0, s.completati - s.pacchetti);
+const finiti = (s: StatisticheAssistente) => s.completati + s.falliti;
+// La riuscita in percentuale, arrotondata. Un numero solo per scheda, ordinamento e badge
+// "Affidabile": con 26 su 29 (89,7%) la scheda dice 90% e il badge non può restare spento.
+const riuscitaDi = (s: StatisticheAssistente): number | null => (finiti(s) ? Math.round((s.completati / finiti(s)) * 100) : null);
+
+// L'ordine è quello in cui di solito si prendono: la carta mostra gli ultimi presi.
+// Nelle statistiche non c'è il giro del collaudo, quindi "al primo colpo" non si può sapere senza
+// salvare altro: il badge conta il collaudo superato, come scrive il motore in "approvati".
+export const BADGE: readonly RegolaBadge[] = [
+  { id: 'prima-consegna', nome: 'Prima consegna', icona: 'consegna', regola: 'Porta a termine il primo lavoro.', preso: (c) => c.s.completati >= 1 },
+  { id: 'rapporti-10', nome: '10 rapporti', icona: 'rapporto', regola: 'Consegna 10 rapporti, in riunione o al collaudo.', preso: (c) => rapporti(c.s) >= 10 },
+  { id: 'rapporti-25', nome: '25 rapporti', icona: 'rapporti', regola: 'Consegna 25 rapporti, in riunione o al collaudo.', preso: (c) => rapporti(c.s) >= 25 },
+  { id: 'collaudo', nome: 'Collaudo superato', icona: 'collaudo', regola: 'Un suo pacchetto passa il collaudo di Codex.', soloProduzione: true, preso: (c) => c.s.approvati >= 1 },
+  { id: 'collaudi-5', nome: '5 collaudi', icona: 'sigillo', regola: '5 suoi pacchetti passano il collaudo.', soloProduzione: true, preso: (c) => c.s.approvati >= 5 },
+  { id: 'affidabile', nome: 'Affidabile', icona: 'bersaglio', regola: 'Riuscita del 90% o più su almeno 10 lavori.', preso: (c) => finiti(c.s) >= 10 && c.riuscita !== null && c.riuscita >= 90 },
+  { id: 'instancabile', nome: 'Instancabile', icona: 'fulmine', regola: 'Chiamato 50 volte.', preso: (c) => c.s.incarichi >= 50 },
+  { id: 'livello-5', nome: 'Livello 5', icona: 'stella', regola: 'Arriva al livello 5.', preso: (c) => c.livello >= 5 },
+  { id: 'piu-chiamato', nome: 'Il più chiamato', icona: 'corona', regola: 'Il primo della squadra per chiamate.', preso: (c) => c.piuChiamato },
+];
+
+export function badgeDi(a: Pick<Assistente, 'produzione'>, c: ContoBadge): BadgeAssistente[] {
+  return BADGE.filter((b) => !b.soloProduzione || a.produzione)
+    .map(({ id, nome, icona, regola, preso }) => ({ id, nome, icona, regola, preso: preso(c) }));
+}
+
 // --- statistiche in dati/squadra.json -------------------------------------------------------
 
 const FILE_SQUADRA = 'squadra.json';
@@ -418,18 +485,26 @@ export function contaLavoro(dati: string, guadagni: Guadagno[]): void {
   }
 }
 
-// Il catalogo come arriva alla UI: senza istruzioni, con statistiche e livello.
+// Il catalogo come arriva alla UI: senza istruzioni né esempi nella descrizione, con statistiche,
+// livello, titolo e badge.
+// "Il più chiamato" si decide sulla squadra intera del catalogo.
 export function squadraConStatistiche(dati: string, assistenti: readonly VoceCatalogo[]): MembroSquadra[] {
   const tutte = leggiStatistiche(dati);
+  const di = (id: string) => tutte[id] ?? vuote();
+  const massimo = Math.max(0, ...assistenti.map((a) => di(a.id).incarichi));
   return assistenti.map(({ istruzioni: _, ...a }) => {
-    const statistiche = tutte[a.id] ?? vuote();
-    const finiti = statistiche.completati + statistiche.falliti;
+    const statistiche = di(a.id);
+    const riuscita = riuscitaDi(statistiche);
+    const l = livello(statistiche.xp);
     return {
       ...a,
+      descrizione: senzaEsempi(a.descrizione),
       skill: a.skill.map((s) => ({ ...s })),
       statistiche,
-      livello: livello(statistiche.xp),
-      riuscita: finiti ? Math.round((statistiche.completati / finiti) * 100) : null,
+      livello: l,
+      riuscita,
+      titolo: titolo(l.livello),
+      badge: badgeDi(a, { s: statistiche, livello: l.livello, riuscita, piuChiamato: massimo > 0 && statistiche.incarichi === massimo }),
     };
   });
 }

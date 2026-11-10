@@ -13,8 +13,8 @@ export type Inquadratura = 'tutto' | 'sala' | 'squadra' | 'produzione' | 'utente
 export const INQUADRATURE: Record<Inquadratura, { etichetta: string; centro: Punto; larghezza: number; altezza: number }> = {
   tutto: { etichetta: 'Tutto', centro: [1, 0.5], larghezza: 50, altezza: 33 },
   sala: { etichetta: 'Sala', centro: [9, -5], larghezza: 15, altezza: 17 },
-  // Le scrivanie della parete nord, dove lavorano gli assistenti: la sala le taglia.
-  squadra: { etichetta: 'Squadra', centro: [12.2, -9.4], larghezza: 23, altezza: 12 },
+  // L'ufficio a reparti: i quattro a nord, Sviluppo e Qualità a sud, gli ospiti a est.
+  squadra: { etichetta: 'Squadra', centro: [11.8, -1.6], larghezza: 25, altezza: 25 },
   produzione: { etichetta: 'Produzione', centro: [-12, 0.5], larghezza: 25, altezza: 30 },
   utente: { etichetta: 'Tu', centro: [19.5, 9], larghezza: 11, altezza: 11 },
 };
@@ -56,6 +56,34 @@ export function Telecamera({ inquadratura, fuoco, segui, margineSinistro = 0 }: 
     destra.setFromMatrixColumn(camera.matrixWorld, 0).setY(0).normalize();
     return v.addScaledVector(destra, -(margineSinistro / 2) / zoom);
   };
+
+  // Solo in sviluppo: le catture di prova (strumenti/vetrina/cattura.mjs) inquadrano un punto preciso
+  // con window.__inquadra(x, z, zoom) e la vista resta lì (niente "segui chi lavora").
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const w = window as unknown as { __inquadra?: (x: number, z: number, zoom: number, elevazione?: number, azimut?: number) => void };
+    // elevazione e azimut in gradi, per i primi piani dei mobili: si allargano i limiti dei controlli.
+    w.__inquadra = (x, z, zoom, elevazione, azimut) => {
+      const t = new THREE.Vector3(x, 0.8, z);
+      const c = controlli.current;
+      if (elevazione !== undefined || azimut !== undefined) {
+        c.minPolarAngle = 0.05;
+        c.maxPolarAngle = 1.5;
+        c.minAzimuthAngle = -Math.PI;
+        c.maxAzimuthAngle = Math.PI;
+        const el = THREE.MathUtils.degToRad(elevazione ?? 55);
+        const az = THREE.MathUtils.degToRad(azimut ?? 10);
+        camera.position.copy(t).add(new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(DISTANZA));
+      } else camera.position.copy(t).add(DIREZIONE);
+      (camera as THREE.OrthographicCamera).zoom = zoom;
+      camera.updateProjectionMatrix();
+      controlli.current.target.copy(t);
+      controlli.current.update();
+      meta.current = { target: t, zoom, attiva: false };
+      toccato.current = performance.now() + 1e9;
+    };
+    return () => { delete w.__inquadra; };
+  }, [camera]);
 
   // Posizione di partenza, una volta sola.
   useEffect(() => {

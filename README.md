@@ -11,10 +11,10 @@ Ambo è un programma che gira sul tuo PC e si usa dal browser. Ti fa chattare co
 - **Chat.** Scrivi un messaggio e rispondono tutti e due, uno dopo l'altro. Il secondo legge la risposta del primo e aggiunge solo quello che manca, oppure dice che non ha niente da aggiungere.
 - **Scheda compito.** Quando una cosa va fatta, un agente propone una scheda con il tasto **Avvia**.
 - **Riunione.** In una partita Claude e Codex fanno da capi reparto: parlano a turno e preparano insieme il piano, finché tutti e due lo sottoscrivono. Alla fine uno scrive la sintesi e l'altro la verifica. Ottieni un documento in markdown.
-- **Squadra.** Durante la riunione i capi possono affidare incarichi agli assistenti, scelti per il tipo di lavoro: 7 di serie (ricerca, analisi, architettura, testi, design, sviluppo, controllo qualità) e, se lo chiedi, i tuoi agenti di Claude Code. Ogni assistente ha le sue skill, un livello da 1 a 10 e i punti esperienza (XP) che guadagna lavorando.
+- **Squadra.** Durante la riunione i capi possono affidare incarichi agli assistenti, scelti per il tipo di lavoro: 7 di serie (ricerca, analisi, architettura, testi, design, sviluppo, controllo qualità) e, se lo chiedi, i tuoi agenti di Claude Code. Ogni assistente ha un avatar, le sue skill, un livello da 1 a 10 con un titolo, i punti esperienza (XP) che guadagna lavorando e i badge dei traguardi raggiunti.
 - **Procedure.** Modi di lavorare già pronti (sito web, documento, analisi, codice, su misura) che dicono quale assistente fa cosa nel piano, nella produzione e nel collaudo. Puoi aggiungere le tue.
 - **Produzione.** La decisione diventa file in una cartella separata (il cantiere), come una catena di montaggio: gli assistenti costruiscono i pacchetti di lavoro uno dopo l'altro, Codex fa il collaudo e gli eventuali passi di collaudo della procedura rivedono i file. Se il collaudo non passa, si corregge.
-- **Ufficio 3D.** Una scena con gli omini dei capi reparto e degli assistenti: vedi chi pensa, chi cerca nelle note, chi scrive, chi lavora a un incarico.
+- **Ufficio 3D.** Un ufficio diviso in reparti, con gli omini dei capi reparto e degli assistenti: vedi chi pensa, chi cerca nelle note, chi scrive, chi lavora a un incarico. Nel magazzino la catena di montaggio segue la produzione stazione per stazione.
 - **Voce** (facoltativa). Detti i messaggi; la trascrizione può restare sul PC.
 
 Il programma non ha una parte online, non ha account suoi e non raccoglie dati di uso. Il server ascolta solo sul tuo PC (127.0.0.1).
@@ -338,7 +338,7 @@ Dopo una modifica al file `.env`, riavvia il programma.
 
 Scegli chi risponde con il selettore **Tutti / Claude / Codex**, oppure comincia il messaggio con `@claude` o `@codex` per far rispondere solo uno, o con `@tutti` per farli rispondere tutti e due.
 
-Sotto ogni risposta vedi i token usati.
+Tempi e token di una risposta si vedono cliccandola; con «Mostra tempi e token» nel menu ⋯ restano sempre visibili.
 
 Altre cose che puoi fare in chat:
 
@@ -392,7 +392,9 @@ Con `AMBO_AMBIENTE=1` si aggiungono i tuoi agenti di Claude Code (vedi [Configur
 - Ogni assistente lavora da solo, in una sessione nuova, con le stesse regole dei capi reparto: sola lettura, note e ricerca web solo se sono accese. Non vede la riunione: riceve l'obiettivo, il compito e l'eventuale materiale.
 - Al massimo 2 incarichi per intervento e 8 per riunione. Gli incarichi oltre il limite, o per un assistente che non c'è, si scartano e la riunione lo dice.
 - Se un incarico non riesce, la riunione va avanti e i capi ricevono l'errore al posto del rapporto. Si ferma tutto solo per i controlli di sicurezza (chiave API, crediti extra, strumento non ammesso).
-- **Esperienza e livelli.** Un rapporto consegnato o una revisione fatta vale 20 XP, un pacchetto di produzione fatto 30, un collaudo superato altri 20 a ogni assistente che ha costruito un pacchetto. Un incarico fallito non dà XP. I livelli vanno da 1 a 10. Il pannello **Squadra** nella pagina Partite mostra tutti gli assistenti con livello, barra dell'XP e quante volte sono stati chiamati; un tocco apre la scheda con le skill e le statistiche (chiamato, completati, falliti, pacchetti, collaudi superati, riuscita). I numeri stanno in `dati/squadra.json`.
+- **Esperienza e livelli.** Un rapporto consegnato o una revisione fatta vale 20 XP, un pacchetto di produzione fatto 30, un collaudo superato altri 20 a ogni assistente che ha costruito un pacchetto. Un incarico fallito non dà XP. I livelli vanno da 1 a 10, con un titolo ogni due: Apprendista, Operativo, Esperto, Veterano, Leggenda. I numeri stanno in `dati/squadra.json`.
+- **Badge.** Sono traguardi presi dalle statistiche: prima consegna, 10 e 25 rapporti, collaudo superato e 5 collaudi (solo per chi lavora in produzione), affidabile (riuscita del 90% o più su almeno 10 lavori), instancabile (50 chiamate), livello 5, il più chiamato della squadra. Quelli che mancano si vedono spenti, con la regola.
+- **Pannello Squadra**, nella pagina Partite: in cima il podio dei tre con più XP, sotto una carta per assistente con avatar, nome, livello, barra dell'XP e gli ultimi badge presi. L'ordine si sceglie: esperienza, chiamate o riuscita. Un tocco su una carta apre la scheda completa: descrizione intera, titolo, XP che mancano al livello dopo, tutti i badge, skill, statistiche (chiamato, completati, falliti, pacchetti, collaudi superati, riuscita) e ultimi lavori. Sul telefono la scheda prende tutto lo schermo; si chiude con la X, con Esc o toccando fuori.
 
 Nella sintesi i capi scelgono anche la **procedura** e dividono il lavoro per la produzione in **pacchetti** (al massimo 5), ognuno con il suo assistente.
 
@@ -418,16 +420,32 @@ Nell'ufficio 3D gli omini mostrano cosa stanno facendo gli agenti: pensano, cerc
 - le skill in uso, solo se la CLI lo conferma;
 - le skill a disposizione.
 
-Gli assistenti chiamati nella partita aperta siedono alle 7 scrivanie della parete nord, nell'ordine in cui sono stati chiamati (se sono di più, compaiono solo nei pannelli; sul telefono se ne vedono al massimo tre). Il loro cartellino porta il nome, il livello ("Lv") e la barra dell'XP; mentre lavorano hanno il fumetto "Al lavoro". Un tocco apre la loro scheda: ruolo, livello, skill, statistiche, cosa stanno facendo e gli incarichi della partita.
+L'ufficio è diviso in reparti, ognuno con il suo cartello a terra:
 
-Il pannello **Lavori** mostra cosa è al lavoro adesso e cosa aspetta una tua decisione.
+| Reparto | Chi ci siede |
+|---|---|
+| Direzione | Claude e Codex, con la lavagna del piano della partita aperta |
+| Ricerca e analisi | Rita, Marco |
+| Progettazione | Elena, Sara |
+| Contenuti | Luca |
+| Sviluppo | Paolo e i tuoi agenti che lavorano in produzione |
+| Qualità | Nadia e i tuoi agenti di collaudo |
+| Ospiti | i tuoi agenti che non stanno in nessun altro reparto, o che non trovano posto |
+
+- Claude e Codex vanno in sala riunioni solo durante la riunione (sintesi e verifica comprese), poi tornano alle loro scrivanie in Direzione. In chat rispondono da lì. Codex scende al banco del collaudo quando la produzione è in collaudo.
+- Gli assistenti chiamati nella partita aperta siedono nel loro reparto. Un tuo agente va nel reparto più vicino al suo ruolo, ricavato dalla procedura, dalla produzione o dalla descrizione. Se non c'è posto neanche tra gli ospiti, compare solo nei pannelli.
+- Il cartellino porta il nome, il livello ("Lv") e la barra dell'XP, nel colore del suo avatar; mentre lavorano hanno il fumetto "Al lavoro" e lo schermo acceso. Un tocco apre la loro scheda: ruolo, livello, skill, statistiche, cosa stanno facendo e gli incarichi della partita.
+- Nel magazzino la catena di montaggio ha cinque stazioni: **Piano** (la sintesi approvata), **Costruzione** (una postazione per pacchetto, con chi lo costruisce), **Collaudo** (Codex e gli assistenti di collaudo della procedura), **Correzioni** (solo se servono) e **Consegna**. La scatola del lavoro sta alla stazione dove la produzione è davvero.
+- Con la grafica ridotta (di serie sul telefono, o quando il PC rallenta) si animano al massimo 4 assistenti: prima chi lavora.
+
+In chat i **Lavori** stanno in una riga sola, per esempio "2 da decidere · 1 al lavoro": un tocco apre l'elenco di cosa è al lavoro adesso e di cosa aspetta una tua decisione.
 
 ### Voce
 
 La voce è facoltativa.
 
 - **Trascrizione sul PC** (consigliata): usa faster-whisper con il modello `small`, su CPU. L'audio non esce dal PC. Va installata con `npm run voce:installa`.
-- **Dettatura del browser**: in alternativa, dal menu della chat. Passa dai servizi di Google o di Apple, a seconda del browser.
+- **Dettatura del browser**: in alternativa, dal menu della chat. Passa dal servizio vocale di chi fa il browser, per esempio Google con Chrome o Apple con Safari.
 
 La trascrizione sul PC è in italiano di serie: la lingua si cambia con `AMBO_LINGUA_VOCE`. Con `AMBO_WHISPER_PAROLE` suggerisci parole che sbaglia spesso (nomi propri, termini tecnici).
 
@@ -489,7 +507,7 @@ Ogni uso consuma la quota dei tuoi abbonamenti:
 - ogni incarico alla squadra è una chiamata in più, ogni pacchetto e ogni revisione della produzione anche;
 - la produzione costa di più.
 
-I token si vedono sotto ogni risposta e nel documento finale. Numeri ed esempi: [docs/REQUISITI-E-COSTI.md](docs/REQUISITI-E-COSTI.md).
+I token si vedono cliccando una risposta (o sempre, con «Mostra tempi e token» nel menu ⋯) e nel documento finale. Numeri ed esempi: [docs/REQUISITI-E-COSTI.md](docs/REQUISITI-E-COSTI.md).
 
 ## Sicurezza in breve
 

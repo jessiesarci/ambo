@@ -247,8 +247,12 @@ function applica(v: Vista, e: Evento, ora: number): Vista {
         effetti: [...v.effetti, { id: nuovoId(), tipo: 'esito', esito: e.esito, approvata: e.approvata }],
       };
     case 'produzione': {
+      // Ferma, o passata a un'altra fase (dalla costruzione al collaudo, dal collaudo alla correzione):
+      // chi lavorava prima non lavora più. L'evento arriva prima dell'istantanea, quindi lo stato
+      // salvato è ancora quello vecchio; il vivo nuovo arriva col primo evento della fase.
       const fermo = e.stato !== 'in_lavorazione' && e.stato !== 'collaudo';
-      const w = fermo && v.assistente?.dove === 'produzione' ? { ...v, assistente: undefined } : v;
+      const cambia = fermo || e.stato !== v.dibattito?.produzione?.stato;
+      const w = cambia && v.assistente?.dove === 'produzione' ? { ...v, assistente: undefined } : v;
       return e.testo ? { ...w, avvisi: [...w.avvisi.slice(-3), { id: nuovoId(), testo: e.testo, grave: e.stato === 'errore' }] } : w;
     }
     // La squadra: un incarico che comincia mette al lavoro l'assistente e ferma i capi reparto.

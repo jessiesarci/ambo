@@ -1,13 +1,15 @@
-// La squadra nell'interfaccia: la barra dell'esperienza, la scheda di un assistente e il
-// pannello della lobby con tutto il catalogo e le procedure.
-import { Users, X } from 'lucide-react';
-import { useState } from 'react';
-import { NOME, type MembroSquadra, type Procedura } from '../../../motore/tipi.ts';
+// La squadra nell'interfaccia: la barra dell'esperienza, i badge, la scheda completa di un
+// assistente e il pannello della lobby con podio, carte compatte e procedure.
+import { Award, BadgeCheck, Crown, FileText, Files, PackageCheck, ShieldCheck, Star, Target, Users, X, Zap, type LucideIcon } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { NOME, type BadgeAssistente, type MembroSquadra, type Procedura } from '../../../motore/tipi.ts';
 import {
-  alLavoro, avanzamento, breve, chiE, inCoda, lavoriDi, perEsperienza, STATO_INCARICO, STATO_PACCHETTO, usaSquadra, type VoceLavoro,
+  alLavoro, avanzamento, badgeDi, badgeInVetrina, breve, chiE, inCoda, lavoriDi, mancano, ORDINI, ordina, podio, STATO_INCARICO, STATO_PACCHETTO,
+  titoloDi, usaSquadra, type Ordine, type VoceLavoro,
 } from '../squadra.ts';
 import type { Vista } from '../stato.ts';
-import { quanti, TestoMd } from './comuni.tsx';
+import { Avatar } from './Avatar.tsx';
+import { quanti, TestoMd, usaFinestra } from './comuni.tsx';
 
 const FASE: Record<Procedura['passi'][number]['fase'], string> = { piano: 'piano', produzione: 'produzione', collaudo: 'collaudo' };
 
@@ -22,7 +24,7 @@ export function BarraXP({ membro, sottile }: { membro?: MembroSquadra; sottile?:
     <div className={sottile ? 'min-w-0 flex-1' : 'mt-2'}>
       {!sottile && (
         <div className="flex items-center justify-between">
-          <span className="etichetta !text-[10px]">Livello {l.livello}</span>
+          <span className="etichetta !text-[10px]">Esperienza</span>
           <span className="font-dati text-[11px] text-grafite">{cifre}</span>
         </div>
       )}
@@ -40,13 +42,9 @@ export function BarraXP({ membro, sottile }: { membro?: MembroSquadra; sottile?:
   );
 }
 
-export function Livello({ membro, grande }: { membro?: MembroSquadra; grande?: boolean }) {
+export function Livello({ membro }: { membro?: MembroSquadra }) {
   if (!membro) return null;
-  return (
-    <span className={`inline-grid shrink-0 place-items-center rounded-[6px] bg-inchiostro font-dati font-bold text-giallo ${grande ? 'h-11 w-11 text-[13px] leading-none' : 'px-1.5 py-px text-[11px]'}`}>
-      {grande ? <span className="text-center"><span className="block text-[9px] font-semibold tracking-wider text-white/70">LV</span>{membro.livello.livello}</span> : `Lv ${membro.livello.livello}`}
-    </span>
-  );
+  return <span className="inline-grid shrink-0 place-items-center rounded-[6px] bg-inchiostro px-1.5 py-px font-dati text-[11px] font-bold text-giallo">Lv {membro.livello.livello}</span>;
 }
 
 function Fonte({ fonte }: { fonte?: MembroSquadra['fonte'] }) {
@@ -54,6 +52,40 @@ function Fonte({ fonte }: { fonte?: MembroSquadra['fonte'] }) {
   return fonte === 'utente'
     ? <span className="rounded-full bg-[#effcc9] px-1.5 py-px font-titolo text-[10px] font-bold uppercase tracking-wide text-[#3f5600]">Tuo agente</span>
     : <span className="rounded-full bg-[#eceef1] px-1.5 py-px font-titolo text-[10px] font-bold uppercase tracking-wide text-[#4a5058]">Standard</span>;
+}
+
+// --- badge ------------------------------------------------------------------------------------
+
+const ICONE: Record<string, LucideIcon> = {
+  consegna: PackageCheck, rapporto: FileText, rapporti: Files, collaudo: BadgeCheck, sigillo: ShieldCheck,
+  bersaglio: Target, fulmine: Zap, stella: Star, corona: Crown,
+};
+
+// Un badge come icona: nero con il disegno lime se preso, grigio chiaro se ancora da prendere.
+export function IconaBadge({ b, dimensione = 26 }: { b: BadgeAssistente; dimensione?: number }) {
+  const Icona = ICONE[b.icona] ?? Award;
+  return (
+    <span
+      className={`inline-grid shrink-0 place-items-center rounded-[8px] ${b.preso ? 'bg-inchiostro text-giallo' : 'border border-dashed border-[#c4c8ce] bg-[#f6f7f8] text-[#a9aeb5]'}`}
+      style={{ width: dimensione, height: dimensione }}
+      title={`${b.nome}: ${b.regola}`}
+      aria-hidden
+    >
+      <Icona size={Math.round(dimensione * 0.56)} strokeWidth={2.2} />
+    </span>
+  );
+}
+
+function Badge({ b }: { b: BadgeAssistente }) {
+  return (
+    <li className="flex items-start gap-2">
+      <IconaBadge b={b} dimensione={30} />
+      <span className="min-w-0">
+        <span className={`block font-titolo text-[13px] font-bold leading-tight ${b.preso ? '' : 'text-grafite'}`}>{b.nome}<span className="sr-only">{b.preso ? ', preso' : ', da prendere'}</span></span>
+        <span className="block text-[11.5px] leading-snug text-grafite">{b.regola}</span>
+      </span>
+    </li>
+  );
 }
 
 const quando = (iso?: string) => (iso ? new Date(iso).toLocaleString('it-CH', { dateStyle: 'short', timeStyle: 'short' }) : '');
@@ -110,9 +142,20 @@ function VoceDellaPartita({ v }: { v: VoceLavoro }) {
   );
 }
 
-// La scheda di un assistente: chi è, quanto ha lavorato, cosa sa fare e, in una partita aperta,
-// cosa fa adesso e cosa ha consegnato.
-export function SchedaAssistente({ id, vista, onChiudi }: { id: string; vista?: Vista; onChiudi: () => void }) {
+function Sezione({ titolo, children }: { titolo: string; children: ReactNode }) {
+  return (
+    <section className="mt-3 border-t border-bordo pt-2.5">
+      <h4 className="etichetta">{titolo}</h4>
+      {children}
+    </section>
+  );
+}
+
+// La scheda completa di un assistente: chi è, livello e quanto manca, tutti i badge, la
+// descrizione intera, cosa sa fare, i numeri e, in una partita aperta, cosa fa adesso e cosa ha
+// consegnato. Sul telefono riempie lo schermo (lo decide chi la contiene); si chiude con X o Esc.
+// modale: sta sopra un velo che copre tutto (la lobby), quindi tiene il Tab dentro di sé.
+export function SchedaAssistente({ id, vista, onChiudi, className = '', modale = false }: { id: string; vista?: Vista; onChiudi: () => void; className?: string; modale?: boolean }) {
   const { squadra } = usaSquadra();
   const chi = chiE(squadra, id);
   const m = chi.membro;
@@ -122,6 +165,12 @@ export function SchedaAssistente({ id, vista, onChiudi }: { id: string; vista?: 
   const coda = inCoda(d).find((i) => i.assistente === id);
   const azione = vista?.assistente?.id === id ? vista.assistente.azione?.testo : undefined;
   const voci = lavoriDi(d, id).slice(0, 6);
+  // Esc e il focus che torna a chi l'ha aperta; prima di spostare il focus sulla X, così si sa da dove viene.
+  const pannello = usaFinestra(onChiudi, modale);
+  const chiudi = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    chiudi.current?.focus({ preventScroll: true });
+  }, [id]);
   // In partita conta cosa fa adesso; nella lobby, quando ha lavorato l'ultima volta.
   const [titoloStato, testoStato] = d
     ? ['Adesso', lavoro ? `Al lavoro: ${breve(lavoro.cosa, 120)}${azione ? ` · ${azione}` : ''}` : coda ? `In coda: ${breve(coda.compito, 120)}` : 'Libero']
@@ -134,47 +183,48 @@ export function SchedaAssistente({ id, vista, onChiudi }: { id: string; vista?: 
     ['Collaudi superati', String(s.approvati)],
     ['Riuscita', m.riuscita === null ? '—' : `${m.riuscita}%`],
   ] : [];
+  const manca = m ? mancano(m) : null;
+  const badge = m ? badgeDi(m) : [];
+  const presi = badge.filter((b) => b.preso).length;
   return (
-    <div className="pannello pointer-events-auto scorri max-h-[70dvh] w-full max-w-sm animate-[comparsa_.2s_ease-out] overflow-y-auto p-3" role="dialog" aria-label={`Scheda di ${chi.nome}`}>
-      <div className="flex items-start gap-2.5">
-        <Livello membro={m} grande />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <h3 className="font-titolo text-[17px] font-bold leading-tight">{chi.nome}</h3>
-            <Fonte fonte={m?.fonte} />
-          </div>
-          <p className="mt-0.5 text-[12.5px] text-grafite">{[chi.ruolo, `lavora con ${NOME[chi.motore]}`, m?.produzione ? 'costruisce in produzione' : ''].filter(Boolean).join(' · ')}</p>
+    <div ref={pannello} className={`pannello pointer-events-auto scorri flex w-full flex-col overflow-y-auto overscroll-contain p-4 animate-[comparsa_.2s_ease-out] ${className}`} role="dialog" aria-modal={modale} aria-label={`Scheda di ${chi.nome}`}>
+      <div className="flex items-start gap-3">
+        <Avatar id={id} dimensione={76} />
+        <div className="min-w-0 flex-1 pt-0.5">
+          <h3 className="font-titolo text-[20px] font-bold leading-tight [overflow-wrap:anywhere]">{chi.nome}</h3>
+          <p className="mt-0.5 text-[12.5px] leading-snug text-grafite">{[chi.ruolo, `lavora con ${NOME[chi.motore]}`, m?.produzione ? 'costruisce in produzione' : ''].filter(Boolean).join(' · ')}</p>
+          {m && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <Livello membro={m} />
+              <span className="font-titolo text-[13px] font-bold">{titoloDi(m)}</span>
+              <Fonte fonte={m.fonte} />
+            </div>
+          )}
         </div>
-        <button className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-grafite hover:bg-cartaScura" onClick={onChiudi} aria-label="Chiudi la scheda">
-          <X size={16} />
+        <button ref={chiudi} className="-mr-1 -mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-lg text-grafite hover:bg-cartaScura" onClick={onChiudi} aria-label="Chiudi la scheda">
+          <X size={18} />
         </button>
       </div>
-      {m?.descrizione && <p className="mt-2 text-[13px] leading-snug">{m.descrizione}</p>}
       <BarraXP membro={m} />
+      {m && <p className="mt-1 text-[12px] text-grafite">{manca ? `Mancano ${manca.xp} XP al livello ${manca.livello}.` : 'Livello massimo raggiunto.'}</p>}
       <p className={`mt-2.5 rounded-lg px-2.5 py-1.5 text-[13px] ${lavoro ? 'bg-inchiostro text-white' : 'bg-cartaScura'}`}>
         <span className={`etichetta mr-1 ${lavoro ? '!text-giallo' : ''}`}>{titoloStato}</span>{testoStato}
       </p>
-      {/* In partita prima quello che ha fatto qui, poi i numeri di sempre e le skill. */}
+      {m?.descrizione && <p className="mt-2.5 whitespace-pre-line text-[14px] leading-snug">{m.descrizione}</p>}
+      {!m && <p className="mt-2 text-[12.5px] text-grafite">Non è più nel catalogo della squadra, o il motore non ha ancora mandato l'elenco: restano i lavori di questa partita.</p>}
+      {/* In partita prima quello che ha fatto qui. */}
       {d && (
-        <div className="mt-2.5">
-          <div className="etichetta">In questa partita</div>
+        <Sezione titolo="In questa partita">
           {voci.length ? <ul className="mt-1 space-y-1.5">{voci.map((v, i) => <VoceDellaPartita key={i} v={v} />)}</ul> : <p className="mt-0.5 text-[12.5px] text-grafite">Non è stato chiamato.</p>}
-        </div>
+        </Sezione>
       )}
-      {numeri.length > 0 && (
-        <dl className="mt-2.5 grid grid-cols-3 gap-1.5">
-          {numeri.map(([k, v]) => (
-            <div key={k} className="rounded-lg border border-bordo px-2 py-1.5">
-              <dt className="text-[10.5px] leading-tight text-grafite">{k}</dt>
-              <dd className="font-dati text-[13px] font-semibold">{v}</dd>
-            </div>
-          ))}
-        </dl>
+      {badge.length > 0 && (
+        <Sezione titolo={`Badge · ${presi} di ${badge.length}`}>
+          <ul className="mt-1.5 grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2">{badge.map((b) => <Badge key={b.id} b={b} />)}</ul>
+        </Sezione>
       )}
-      {!m && <p className="mt-2 text-[12.5px] text-grafite">Non è più nel catalogo della squadra, o il PC non ha ancora mandato l'elenco: restano i lavori di questa partita.</p>}
       {m && m.skill.length > 0 && (
-        <div className="mt-3 border-t border-bordo pt-2">
-          <div className="etichetta">Skill</div>
+        <Sezione titolo="Competenze">
           <ul className="mt-1 space-y-1">
             {m.skill.map((k) => (
               <li key={k.nome} className="text-[13px] leading-snug">
@@ -183,7 +233,19 @@ export function SchedaAssistente({ id, vista, onChiudi }: { id: string; vista?: 
               </li>
             ))}
           </ul>
-        </div>
+        </Sezione>
+      )}
+      {numeri.length > 0 && (
+        <Sezione titolo="Statistiche">
+          <dl className="mt-1.5 grid grid-cols-3 gap-1.5">
+            {numeri.map(([k, v]) => (
+              <div key={k} className="rounded-lg border border-bordo px-2 py-1.5">
+                <dt className="text-[10.5px] leading-tight text-grafite">{k}</dt>
+                <dd className="font-dati text-[13px] font-semibold">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </Sezione>
       )}
     </div>
   );
@@ -211,41 +273,84 @@ function Procedure({ procedure }: { procedure: Procedura[] }) {
   );
 }
 
-// Il pannello della lobby: tutto il catalogo, chi ha più esperienza in alto. Un tocco apre la scheda.
+// I primi tre per esperienza, il primo al centro e più in alto.
+function Podio({ primi, onApri }: { primi: MembroSquadra[]; onApri: (id: string) => void }) {
+  if (primi.length < 2) return null;
+  const posti = [primi[1], primi[0], primi[2]] as (MembroSquadra | undefined)[];
+  const gradino = ['h-6', 'h-8', 'h-5'];
+  const numero = [2, 1, 3];
+  return (
+    <ol className="grid grid-cols-3 items-end gap-1.5 border-b border-bordo px-3 pb-0 pt-2.5" aria-label="Podio per esperienza">
+      {posti.map((m, i) => (
+        <li key={m?.id ?? `vuoto-${i}`} className="flex min-w-0 flex-col items-center" style={{ order: i }}>
+          {m && (
+            <button className="flex w-full min-w-0 flex-col items-center rounded-lg px-1 pt-1 hover:bg-cartaScura" onClick={() => onApri(m.id)} aria-label={`${numero[i]}° posto: ${m.nome}, ${m.statistiche.xp} XP`}>
+              <Avatar id={m.id} dimensione={i === 1 ? 50 : 40} />
+              <span className="mt-1 w-full truncate text-center font-titolo text-[12.5px] font-bold leading-tight">{m.nome}</span>
+              <span className="font-dati text-[10.5px] text-grafite">{m.statistiche.xp} XP</span>
+            </button>
+          )}
+          <span className={`mt-1 grid w-full place-items-center rounded-t-md ${m ? 'bg-inchiostro' : 'bg-transparent'} ${gradino[i]} font-dati text-[10.5px] font-bold leading-none text-giallo`} aria-hidden>{m ? numero[i] : ''}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+// Una carta compatta: avatar, nome, livello con il titolo, barra XP e al massimo tre badge.
+function Carta({ m, aperto, onApri }: { m: MembroSquadra; aperto: boolean; onApri: () => void }) {
+  const vetrina = badgeInVetrina(m);
+  return (
+    <button
+      className={`flex w-full min-w-0 flex-col gap-1.5 rounded-xl border p-2 text-left transition-colors ${aperto ? 'border-inchiostro bg-[#f1f2f4]' : 'border-bordo bg-white hover:border-[#c4c8ce] hover:bg-[#fafafb]'}`}
+      onClick={onApri}
+      aria-pressed={aperto}
+      aria-label={`${m.nome}, livello ${m.livello.livello}, ${titoloDi(m)}, ${m.statistiche.xp} XP`}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <Avatar id={m.id} dimensione={40} />
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 font-titolo text-[13.5px] font-bold leading-tight [overflow-wrap:anywhere]">{m.nome}</span>
+          <span className="mt-0.5 flex items-center gap-1 text-[11px] text-grafite"><Livello membro={m} /> {titoloDi(m)}</span>
+        </span>
+      </span>
+      <BarraXP membro={m} sottile />
+      <span className="flex h-[22px] items-center gap-1">
+        {vetrina.map((b) => <IconaBadge key={b.id} b={b} dimensione={22} />)}
+        <span className="ml-auto font-dati text-[10.5px] text-grafite">{m.statistiche.xp} XP</span>
+      </span>
+    </button>
+  );
+}
+
+// Il pannello della lobby: podio, ordinamento a scelta e la griglia delle carte. Un tocco apre la scheda.
 export function PannelloSquadra({ aperto, onApri, caricamento }: { aperto?: string | null; onApri: (id: string) => void; caricamento?: string }) {
   const { squadra, procedure } = usaSquadra();
-  const ordinati = perEsperienza(squadra);
+  const [ordine, setOrdine] = useState<Ordine>('esperienza');
+  const ordinati = ordina(squadra, ordine);
   return (
     <section className="pannello pointer-events-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden" aria-label="Squadra">
-      <div className="flex items-center gap-2 border-b border-bordo px-4 py-3">
-        <Users size={18} />
-        <h2 className="font-titolo text-[18px] font-bold">Squadra</h2>
-        <span className="ml-auto text-[12px] text-grafite">{squadra.length ? `${quanti(squadra.length, 'assistente', 'assistenti')}, per esperienza` : ''}</span>
-      </div>
-      <ul className="scorri min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
-        {!squadra.length && <li className="p-3 text-[13px] text-grafite">{caricamento ?? 'Carico la squadra…'}</li>}
-        {ordinati.map((m) => (
-          <li key={m.id}>
-            <button
-              className={`w-full rounded-xl border px-2.5 py-2 text-left transition-colors ${aperto === m.id ? 'border-inchiostro bg-[#f1f2f4]' : 'border-transparent hover:bg-cartaScura'}`}
-              onClick={() => onApri(m.id)}
-              aria-pressed={aperto === m.id}
-            >
-              <div className="flex items-center gap-2">
-                <Livello membro={m} />
-                <span className="truncate font-titolo text-[14px] font-bold">{m.nome}</span>
-                {m.fonte === 'utente' && <Fonte fonte="utente" />}
-                <span className="ml-auto shrink-0 font-dati text-[11px] text-grafite">{m.statistiche.xp} XP</span>
-              </div>
-              <div className="mt-0.5 truncate text-[12px] text-grafite">{m.ruolo}</div>
-              <div className="mt-1.5 flex items-center gap-2">
-                <BarraXP membro={m} sottile />
-                <span className="w-[7.5rem] shrink-0 text-right text-[11px] text-grafite">chiamato {quanti(m.statistiche.incarichi, 'volta', 'volte')}</span>
-              </div>
+      <div className="flex items-center gap-2 border-b border-bordo px-3 py-2.5">
+        <Users size={18} aria-hidden />
+        <h2 className="font-titolo text-[17px] font-bold">Squadra</h2>
+        {squadra.length > 0 && <span className="font-dati text-[11px] text-grafite">{squadra.length}</span>}
+        <div className="ml-auto inline-flex rounded-lg border border-bordo bg-cartaScura p-0.5" role="radiogroup" aria-label="Ordina la squadra">
+          {(Object.keys(ORDINI) as Ordine[]).map((o) => (
+            <button key={o} role="radio" aria-checked={ordine === o} className={`rounded-md px-2 py-1 font-titolo text-[11.5px] font-semibold ${ordine === o ? 'bg-inchiostro text-white' : 'text-grafite hover:text-inchiostro'}`} onClick={() => setOrdine(o)}>
+              {ORDINI[o]}
             </button>
-          </li>
-        ))}
-      </ul>
+          ))}
+        </div>
+      </div>
+      <div className="scorri min-h-0 flex-1 overflow-y-auto">
+        {!squadra.length && <p className="p-3 text-[13px] text-grafite">{caricamento ?? 'Carico la squadra…'}</p>}
+        <Podio primi={podio(squadra)} onApri={onApri} />
+        <ul className="grid grid-cols-2 gap-1.5 p-2">
+          {ordinati.map((m) => (
+            <li key={m.id} className="min-w-0"><Carta m={m} aperto={aperto === m.id} onApri={() => onApri(m.id)} /></li>
+          ))}
+        </ul>
+      </div>
       {procedure.length > 0 && <Procedure procedure={procedure} />}
     </section>
   );
