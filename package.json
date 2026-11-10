@@ -1,11 +1,11 @@
 {
   "name": "ambo",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Chatta con Claude Code e Codex insieme, sul tuo PC, con i tuoi abbonamenti. Solo locale.",
   "type": "module",
   "private": true,
   "author": "Jessie Sarcinella",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "engines": {
     "node": ">=24"
   },

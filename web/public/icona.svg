@@ -1,1 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#141518"/><circle cx="22" cy="29" r="9" fill="#b5f900"/><circle cx="42" cy="29" r="9" fill="#9aa3ad"/><rect x="14" y="43" width="36" height="6" rx="3" fill="#ffffff"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="7" fill="#141518"/>
+  <g fill="none" stroke="#f1f2f4" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"><path d="M11 13.5 L21 13.5 C25.2 13.5 28 16.2 28 20 L28 26 C28 28.3 26.6 29.5 24 29.5 L8 29.5 C5.4 29.5 4 28.3 4 26 L4 20 C4 16.2 6.8 13.5 11 13.5 Z"/><path d="M15.6 10 C13 10.8 9.4 10.2 8.7 7.7 C8.3 6.3 8.6 5.1 9.2 4.4 C10.5 5.4 12.4 5.3 13.8 6.3 C15.2 7.3 15.8 8.6 15.6 10 Z"/><path d="M16.4 10 C19 10.8 22.6 10.2 23.3 7.7 C23.7 6.3 23.4 5.1 22.8 4.4 C21.5 5.4 19.6 5.3 18.2 6.3 C16.8 7.3 16.2 8.6 16.4 10 Z"/><path d="M16 14 L16 10"/></g>
+  <path d="M16 14 L16 10" fill="none" stroke="#141518" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M15.6 10 C13 10.8 9.4 10.2 8.7 7.7 C8.3 6.3 8.6 5.1 9.2 4.4 C10.5 5.4 12.4 5.3 13.8 6.3 C15.2 7.3 15.8 8.6 15.6 10 Z" fill="#b5f900" stroke="#141518" stroke-width="1.1" stroke-linejoin="round"/>
+  <path d="M16.4 10 C19 10.8 22.6 10.2 23.3 7.7 C23.7 6.3 23.4 5.1 22.8 4.4 C21.5 5.4 19.6 5.3 18.2 6.3 C16.8 7.3 16.2 8.6 16.4 10 Z" fill="#9aa3ad" stroke="#141518" stroke-width="1.1" stroke-linejoin="round"/>
+  <path d="M11 13.5 L21 13.5 C25.2 13.5 28 16.2 28 20 L28 26 C28 28.3 26.6 29.5 24 29.5 L8 29.5 C5.4 29.5 4 28.3 4 26 L4 20 C4 16.2 6.8 13.5 11 13.5 Z" fill="#ffffff" stroke="#141518" stroke-width="1.5" stroke-linejoin="round"/>
+  <g fill="#ffb3c1" shape-rendering="crispEdges"><rect x="7" y="24" width="3" height="2"/><rect x="22" y="24" width="3" height="2"/></g>
+  <g fill="#141518" shape-rendering="crispEdges"><rect x="10" y="21" width="2" height="3"/><rect x="20" y="21" width="2" height="3"/>
+    <rect x="15" y="25" width="2" height="1"/><rect x="14" y="24" width="1" height="1"/><rect x="17" y="24" width="1" height="1"/></g>
+</svg>

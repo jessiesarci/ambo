@@ -1,3 +1,9 @@
+The MIT License below does not apply to Ambud, the character and face of Ambo (name and artwork).
+Ambud is in these files: web/src/hud/Ambud.tsx, web/public/icona.svg, web/public/icona-180.png,
+web/public/icona-192.png, web/public/icona-512.png, web/public/icona-maskable-512.png and
+web/public/ambud.svg. Ambud is (c) 2026 Jessie Sarcinella, all rights reserved: see README.md,
+section "Licenza".
+
 MIT License
 
 Copyright (c) 2026 Jessie Sarcinella

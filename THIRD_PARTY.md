@@ -1,6 +1,6 @@
 # Materiale di terze parti
 
-Il codice di Ambo è sotto licenza MIT (vedi [LICENSE](LICENSE)). Questo file elenca il materiale di altri autori incluso nel repository o usato dal programma, con la sua licenza.
+Il codice di Ambo è sotto licenza MIT, tranne Ambud (vedi [LICENSE](LICENSE) e il README, sezione "Licenza"). Questo file elenca il materiale di altri autori incluso nel repository o usato dal programma, con la sua licenza.
 
 ## Modelli 3D
 
@@ -15,7 +15,7 @@ Tutti in pubblico dominio (CC0 1.0): uso libero, anche commerciale, senza obblig
 
 Kenney chiede, come cortesia e non come obbligo, di citare "Kenney" o "www.kenney.nl".
 
-La sala riunioni, lo schermo a parete, gli armadi server, la console del collaudo, i cartelli a terra, il tavolo ovale, le vetrate e la navetta robot sono costruiti nel codice del progetto. Le icone dell'app (`web/public/icona*.png`, `web/public/icona.svg`) sono generate dallo script `strumenti/icone.ts` del progetto.
+La sala riunioni, lo schermo a parete, gli armadi server, la console del collaudo, i cartelli a terra, il tavolo ovale, le vetrate e la navetta robot sono costruiti nel codice del progetto. Le icone dell'app (`web/public/icona*.png`, `web/public/icona.svg`) sono la testa di Ambud e non sono sotto licenza MIT: vedi il README, sezione "Licenza".
 
 ## Luci (HDRI)
 

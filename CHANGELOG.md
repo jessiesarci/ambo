@@ -2,6 +2,16 @@
 
 Le versioni seguono il numero in `package.json` e i tag su GitHub (`vX.Y.Z`).
 
+## 0.4.0 · 10 novembre 2026
+
+Ambo ha un volto: Ambud.
+
+- **Ambud.** Un personaggio bianco e tondo con in testa un germoglio di due foglie, una lime come Claude e una grigia come Codex. Il nome viene da Ambo e da *bud*, germoglio in inglese.
+- **Icona nuova.** L'icona del programma è la testa di Ambud: nella scheda del browser, sul telefono e, sul computer, nella testata delle partite.
+- **Nel programma.** Saluta nella chat vuota e nell'archivio delle partite ancora vuoto. Pensa nella riga "sta per rispondere". Chiede scusa, con le foglie ricadute sulla testa, quando una risposta non arriva, quando una partita si ferma per un errore e negli avvisi di errore in fondo alla chat. È contento nelle conferme in fondo alla chat, per esempio quando salvi una nota. Festeggia sopra il cartello di fine partita, se la stai guardando quando finisce con l'accordo: per un attimo le due foglie si toccano.
+- **Movimento ridotto.** Se nel sistema è attivo, Ambud sta fermo e le foglie dell'accordo restano unite. Il cartello di fine partita ora resta visibile: prima, con il movimento ridotto, spariva subito.
+- **Licenza.** Il codice resta MIT, tranne Ambud: il componente, le icone e l'immagine si possono ridistribuire senza modifiche dentro Ambo, anche in una versione modificata che si chiama ancora Ambo (dettagli nel README e in LICENSE).
+
 ## 0.3.0 · 10 novembre 2026
 
 Squadra con meno testo e più gioco, ufficio diviso in reparti, catena di montaggio che segue il lavoro vero.

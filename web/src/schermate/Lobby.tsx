@@ -1,9 +1,10 @@
 // Schermata iniziale sopra l'ufficio: nuova partita a sinistra, archivio e squadra a destra.
 // Sul telefono le tre parti sono schede.
-import { Archive, CheckCircle2, CircleAlert, FolderLock, MessageSquare, Play, Swords } from 'lucide-react';
+import { Archive, CheckCircle2, CircleAlert, FolderLock, MessageSquare, Play } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Agente, ConfigInput } from '../../../motore/tipi.ts';
 import { api, type Accessi, type Info, type Riassunto } from '../api.ts';
+import { Ambud } from '../hud/Ambud.tsx';
 import { BottoneMarkdown, quanti } from '../hud/comuni.tsx';
 import { PannelloSquadra, SchedaAssistente } from '../hud/Squadra.tsx';
 import { ETICHETTE_ESITO } from '../stato.ts';
@@ -36,7 +37,7 @@ export function Lobby({ info, accessi, archivio, serverGiu, avviso, onApri, onRi
     <div className="pointer-events-none flex h-full flex-col gap-2">
       <div className="pannello pointer-events-auto flex flex-wrap items-center gap-3 self-start px-4 py-2.5">
         {onChat && <button className="tasto" onClick={onChat}><MessageSquare size={16} /> Chat</button>}
-        <span className="hidden h-9 w-9 place-items-center rounded-xl bg-inchiostro text-giallo sm:grid"><Swords size={20} /></span>
+        <img src="/icona.svg" width="36" height="36" alt="" className="hidden h-9 w-9 sm:block" />
         <div>
           <h1 className="font-titolo text-[18px] font-bold leading-none sm:text-[20px]">Partite e produzione</h1>
           <p className="mt-1 hidden text-[12.5px] text-grafite sm:block">Un obiettivo, Claude e Codex che preparano il piano, poi il lavoro fatto.</p>
@@ -246,7 +247,7 @@ function Archivio({ archivio, serverGiu, onApri, onRivedi }: { archivio: Riassun
       </div>
       <ul className="scorri flex-1 space-y-2 overflow-y-auto p-2">
         {!archivio && <li className="p-3 text-[13px] text-grafite">{serverGiu ? 'Archivio non disponibile: il server del motore non risponde.' : 'Carico l\x27archivio…'}</li>}
-        {archivio && !archivio.length && <li className="p-3 text-[13px] text-grafite">Nessuna partita ancora. La prima finisce qui, e in una scatola sullo scaffale.</li>}
+        {archivio && !archivio.length && <li className="flex items-center gap-3 p-3 text-[13px] text-grafite"><Ambud umore="saluta" dimensione={64} /><span>Nessuna partita ancora. La prima finisce qui, e in una scatola sullo scaffale.</span></li>}
         {(archivio ?? []).map((r) => (
           <li key={r.id} className="rounded-xl border border-bordo bg-[#ffffff] p-2.5">
             <div className="flex items-center gap-2 text-[11px]">

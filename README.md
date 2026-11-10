@@ -1,8 +1,10 @@
+<p align="center"><img src="web/public/ambud.svg" width="180" alt="Ambud, il volto di Ambo: un personaggio bianco e tondo con in testa un germoglio di due foglie, una lime e una grigia, che saluta con un braccio alzato."></p>
+
 # Ambo
 
-**English summary.** Ambo is a local web app that lets you chat with Claude Code and Codex at the same time, on your own computer, using the official CLIs and your own subscriptions (no API keys by default). The two agents can also plan a goal together in a meeting, hand tasks to a team of assistants chosen for the kind of work, and, if you want, have files written in an isolated folder, one work package after the other, and then reviewed. The interface and the documentation are in Italian.
+**English summary.** Ambo is a local web app that lets you chat with Claude Code and Codex at the same time, on your own computer, using the official CLIs and your own subscriptions (no API keys by default). The two agents can also plan a goal together in a meeting, hand tasks to a team of assistants chosen for the kind of work, and, if you want, have files written in an isolated folder, one work package after the other, and then reviewed. Its face is Ambud, a small white character with a two-leaf sprout: one leaf lime like Claude, one grey like Codex. The interface and the documentation are in Italian.
 
-*Ambo*, in latino: tutti e due.
+*Ambo*, in latino: tutti e due. Il suo volto è **Ambud**: in testa ha un germoglio con due foglie, una lime come Claude e una grigia come Codex, e il nome viene da Ambo e da *bud*, germoglio in inglese. Ti saluta quando apri una chat nuova, chiede scusa quando una risposta non arriva o una partita si ferma per un errore, e festeggia sopra il cartello di fine partita se la guardi finire con l'accordo: in quel momento le due foglie si toccano.
 
 ## Cos'è
 
@@ -498,7 +500,7 @@ Per lo sviluppo: `npm run server:dev` in un terminale e `npm run web` in un altr
 
 ## Cosa serve per usarlo e quanto costa
 
-Il programma è gratuito (licenza MIT). Gli abbonamenti no: ti servono un piano Claude con Claude Code e un piano ChatGPT con Codex.
+Il programma è gratuito. Il codice è sotto licenza MIT, tranne Ambud (vedi [Licenza](#licenza)). Gli abbonamenti no: ti servono un piano Claude con Claude Code e un piano ChatGPT con Codex.
 
 Ogni uso consuma la quota dei tuoi abbonamenti:
 
@@ -542,7 +544,14 @@ Il programma usa le CLI ufficiali con il login di ciascuno. Rispettare le condiz
 
 ## Licenza
 
-MIT, vedi [LICENSE](LICENSE). Modelli 3D, HDRI, font e dipendenze hanno le loro licenze: vedi [THIRD_PARTY.md](THIRD_PARTY.md).
+Il codice è sotto licenza MIT, vedi [LICENSE](LICENSE), tranne Ambud. Modelli 3D, HDRI, font e dipendenze hanno le loro licenze: vedi [THIRD_PARTY.md](THIRD_PARTY.md).
+
+**Ambud**, il volto di Ambo, non rientra nella licenza MIT. Il personaggio (il nome e il disegno) è © 2026 Jessie Sarcinella, tutti i diritti riservati. Sta in questi file:
+- [web/src/hud/Ambud.tsx](web/src/hud/Ambud.tsx);
+- le icone del programma in `web/public`: `icona.svg`, `icona-180.png`, `icona-192.png`, `icona-512.png`, `icona-maskable-512.png`;
+- l'immagine `web/public/ambud.svg`.
+
+Puoi ridistribuire questi file senza modificarli, dentro Ambo o in una sua versione modificata che si chiama ancora Ambo. In un programma con un altro nome, o per ogni altro uso, serve il permesso dell'autore.
 
 ## Non affiliato
 

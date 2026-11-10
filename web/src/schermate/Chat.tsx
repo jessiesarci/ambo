@@ -8,6 +8,7 @@ import {
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { NOME, nomeAutore, type Agente, type Destinatari, type Dibattito, type MessaggioChat } from '../../../motore/tipi.ts';
 import { api, type Accessi, type Info, type Riassunto } from '../api.ts';
+import { Ambud } from '../hud/Ambud.tsx';
 import { Finestra } from '../hud/Comandi.tsx';
 import { chiudiMarcatori, COLORE, durata, quanti, TestoMd } from '../hud/comuni.tsx';
 import { Puntini } from '../scena/Fumetti.tsx';
@@ -822,6 +823,7 @@ export function Chat(p: PropsChat) {
       >
         {vuota ? (
           <div className="m-auto flex max-w-sm flex-col items-center gap-3 px-2 text-center">
+            <Ambud umore="saluta" dimensione={112} className="-mb-1" />
             <h2 className="font-titolo text-[22px] font-bold leading-tight">Claude e Codex sono in ufficio.</h2>
             <p className="text-[14px] text-grafite">Scrivi o registra un vocale: rispondono tutti e due, uno dopo l'altro{haNote ? ', e guardano nelle tue note quando serve' : ''}. Se una cosa va fatta, la trasformi in compito.</p>
             {p.accessi && (!p.accessi.claude.ok || !p.accessi.codex.ok) && <PrimoAvvio accessi={p.accessi} />}
@@ -845,13 +847,16 @@ export function Chat(p: PropsChat) {
                 : <BollaAgente key={m.indice} m={m} leggendo={leggendo === m.indice} onLeggi={() => leggiQuesto(m)} scheda={scheda(m)} dettagli={dettagli === 'si'} />))}
             {inInvio && <BollaUtente m={{ ...inInvio, ora: new Date().toISOString() }} inInvio />}
             {p.vista.parlante && p.vista.ruolo === 'chat' && <BollaDalVivo vista={p.vista} />}
-            {coda.length > 0 && !p.vista.parlante && <div className="flex items-center gap-2 text-[12px] text-grafite"><Puntini /> {coda.map((a) => NOME[a]).join(' e ')} {coda.length > 1 ? 'stanno' : 'sta'} per rispondere</div>}
+            {coda.length > 0 && !p.vista.parlante && <div className="flex items-center gap-2 text-[12px] text-grafite"><Ambud umore="pensa" testa dimensione={26} /><Puntini /> {coda.map((a) => NOME[a]).join(' e ')} {coda.length > 1 ? 'stanno' : 'sta'} per rispondere</div>}
           </>
         )}
         {d?.errore && !occupato && (
-          <div className="rounded-xl border border-[#141518] bg-white p-3 text-[13px]" role="alert">
-            <div className="etichetta !text-[#9b2626]">Risposta non arrivata</div>
-            <p className="mt-1 break-words">{d.errore.messaggio}</p>
+          <div className="flex items-start gap-3 rounded-xl border border-[#141518] bg-white p-3 text-[13px]" role="alert">
+            <Ambud umore="scusa" testa dimensione={44} />
+            <div className="min-w-0">
+              <div className="etichetta !text-[#9b2626]">Risposta non arrivata</div>
+              <p className="mt-1 break-words">{d.errore.messaggio}</p>
+            </div>
           </div>
         )}
         {senzaRisposta && !disabilitato && (
@@ -862,6 +867,7 @@ export function Chat(p: PropsChat) {
       <div className="border-t border-bordo bg-white p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {(errore || p.errore || fatto) && (
           <div className={`mb-1.5 flex items-start gap-2 rounded-xl border px-3 py-2 text-[13px] ${fatto && !errore ? 'border-[#9ad400] bg-[#f4ffd6]' : 'border-[#141518] bg-white'}`} role={errore ? 'alert' : 'status'}>
+            <Ambud umore={errore || p.errore ? 'scusa' : 'contento'} testa dimensione={26} className="-my-0.5" />
             <span className="flex-1 break-words">{errore ?? p.errore ?? fatto}</span>
             <button className="text-grafite" onClick={() => { setErrore(undefined); setFatto(undefined); p.onChiudiErrore?.(); }} aria-label="Chiudi"><X size={16} /></button>
           </div>

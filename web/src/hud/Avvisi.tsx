@@ -6,6 +6,7 @@ import type { Info } from '../api.ts';
 import { alLavoro, chiE, usaSquadra } from '../squadra.ts';
 import { suona } from '../suoni.ts';
 import { ETICHETTE_ESITO, type Azione, type Vista } from '../stato.ts';
+import { Ambud } from './Ambud.tsx';
 import { NomeAgente, PastigliaStato, usaFinestra } from './comuni.tsx';
 import { SchedaAssistente } from './Squadra.tsx';
 
@@ -48,8 +49,12 @@ export function Cartello({ esito }: { esito: Esito | null }) {
   const colore = esito === 'accordo' ? 'text-[#b5f900]' : esito === 'stallo' ? 'text-[#ff3b30]' : 'text-giallo';
   return (
     <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center" aria-hidden>
-      <div className={`animate-[banner_3.2s_ease-out_forwards] rounded-2xl bg-inchiostro/85 px-8 py-4 font-titolo text-[34px] font-bold uppercase sm:text-[52px] ${colore}`}>
-        {ETICHETTE_ESITO[esito]}
+      {/* Con l'accordo sopra il cartello festeggia Ambud: le sue foglie si toccano come Claude e Codex. */}
+      <div className="cartello flex animate-[banner_3.2s_ease-out_forwards] flex-col items-center">
+        {esito === 'accordo' && <Ambud umore="festeggia" dimensione={128} className="-mb-3" />}
+        <div className={`rounded-2xl bg-inchiostro/85 px-8 py-4 font-titolo text-[34px] font-bold uppercase sm:text-[52px] ${colore}`}>
+          {ETICHETTE_ESITO[esito]}
+        </div>
       </div>
     </div>
   );
