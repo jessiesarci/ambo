@@ -277,6 +277,52 @@ Cose da sapere:
 
 Poi avvia il programma (`npm start`) e apri http://127.0.0.1:4317.
 
+## Aggiornare
+
+Il programma non si aggiorna da solo e non controlla se ci sono versioni nuove, perché non si collega a internet per farlo. Le versioni nuove escono nelle [release su GitHub](https://github.com/jessiesarci/ambo/releases), con le novità in [CHANGELOG.md](CHANGELOG.md). Per ricevere un avviso, su GitHub premi **Watch**, poi **Custom** e spunta **Releases** (serve un account GitHub).
+
+Un aggiornamento non tocca le tue cose, che stanno fuori dal codice:
+- chat, partite, cantieri, squadra e note salvate in `dati/` (o nella cartella di `AMBO_DATI`);
+- le impostazioni nel file `.env`;
+- il profilo in `profilo.md`.
+
+Meglio aggiornare quando non ci sono partite o produzioni al lavoro. Chiudendo il programma una partita va in pausa e si riprende, mentre una produzione si ferma e va rilanciata. Chiudi il programma con Ctrl+C nella finestra dove gira.
+
+**Se l'hai scaricato con git**, nella cartella di Ambo:
+
+```bash
+git pull
+npm ci
+npm run build
+npm start
+```
+
+`npm ci` aggiorna le dipendenze, `npm run build` ricompila la dashboard. Se hai modificato dei file del programma, `git pull` può fermarsi e dirti quali sono.
+
+**Se hai scaricato lo zip:**
+
+1. Scarica lo zip della versione nuova dalla [pagina delle release](https://github.com/jessiesarci/ambo/releases) ed estrailo in una cartella nuova, accanto a quella vecchia.
+2. Dalla cartella vecchia copia nella nuova la cartella `dati` e, se li hai, i file `.env` e `profilo.md`.
+   - Su Windows, da PowerShell nella cartella nuova (al posto di `ambo-vecchio` metti il nome della tua cartella vecchia):
+
+     ```powershell
+     Copy-Item -Recurse ..\ambo-vecchio\dati .
+     Copy-Item ..\ambo-vecchio\.env .
+     Copy-Item ..\ambo-vecchio\profilo.md .
+     ```
+
+   - Su macOS e Linux, dal terminale nella cartella nuova:
+
+     ```bash
+     cp -R ../ambo-vecchio/dati ../ambo-vecchio/.env ../ambo-vecchio/profilo.md .
+     ```
+
+   Se un file non c'è, il comando lo dice e puoi andare avanti. Se `AMBO_DATI` punta a una cartella fuori da quella del programma, i dati sono già lì: copia solo `.env` e `profilo.md`.
+3. Nella cartella nuova lancia `npm ci`, `npm run build` e `npm start`, come alla prima installazione.
+4. Quando hai visto che chat e partite ci sono tutte, puoi cancellare la cartella vecchia.
+
+Se dopo l'aggiornamento la trascrizione della voce non funziona più, rilancia `npm run voce:installa`.
+
 ## Configurazione
 
 Tutto è facoltativo. Senza configurazione il programma parte "vuoto": niente profilo, niente note, nessuna tua impostazione di Claude Code. In chat, nelle partite e nel collaudo le CLI lavorano in una cartella temporanea fuori dal repository; in produzione Claude lavora nel cantiere, senza impostazioni né istruzioni di progetto. Codex non legge i file `AGENTS.md` di progetto (compreso quello di questo repository). Un'eccezione: se hai un file globale `~/.codex/AGENTS.md`, Codex lo legge comunque, anche con l'ambiente spento.
