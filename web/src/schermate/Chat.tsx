@@ -2,16 +2,19 @@
 // (o chi sceglie), e intanto si vede cosa stanno facendo: chi pensa, chi cerca nelle note, chi scrive.
 // Da qui una conversazione diventa un compito (una partita e poi la produzione).
 import {
-  ArrowUpRight, Box, Check, ChevronDown, ChevronRight, Copy, Cpu, Ellipsis, Factory, FolderLock, ListChecks, LoaderCircle, Menu, MessageSquare, Mic,
-  NotebookPen, Pause, Play, Plus, RotateCcw, SendHorizontal, Timer, Volume2, VolumeX, X,
+  ArrowUpRight, Box, Check, Copy, Cpu, Ellipsis, FolderLock, ListChecks, LoaderCircle, Menu, MessageSquare, Mic, NotebookPen, Pause, Plus, RotateCcw, SendHorizontal, Timer, Volume2, VolumeX, X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { NOME, nomeAutore, type Agente, type Destinatari, type Dibattito, type MessaggioChat } from '../../../motore/tipi.ts';
 import { api, type Accessi, type Info, type Riassunto } from '../api.ts';
+import { BarraAllegati, Graffetta, usaAllegati } from './Allegati.tsx';
 import { Ambud } from '../hud/Ambud.tsx';
 import { Finestra } from '../hud/Comandi.tsx';
 import { chiudiMarcatori, COLORE, durata, quanti, TestoMd } from '../hud/comuni.tsx';
 import { Puntini } from '../scena/Fumetti.tsx';
+import { Avatar } from '../hud/Avatar.tsx';
+import { attivo as lavoroAttivo, CartaLavoro, FoglioLavoro, MissioneBreve, partitaDellaScheda, type InCampo } from './Lavoro.tsx';
+import { Plancia, UfficioGrande, type ComandiUfficio, type LavoroInPlancia } from './Plancia.tsx';
 import { ETICHETTE_ESITO, inCodaChat, type Vista, type VoceDiario } from '../stato.ts';
 import { leggi, puoDettare, puoLeggereSulPc as puoLeggere, puoRegistrare, smettiDiLeggere, usaVoce, type ModoVoce } from '../voce.ts';
 
@@ -66,51 +69,6 @@ function Pallino({ agente, vivo }: { agente: Agente; vivo?: boolean }) {
   );
 }
 
-// La riga in alto: cosa stanno facendo adesso. Toccandola si apre il diario. Da liberi basta il nome;
-// chi lavora diventa scuro e dice cosa fa. Nella testata chiede almeno 15rem (chi lavora con il suo
-// tempo più l'altro): se accanto il riassunto dei lavori non ci sta, quello va a capo invece di
-// schiacciare le pillole una sopra l'altra. "Risponde dopo" e "Errore" si leggono interi da 20rem
-// in su (la pillola non si stringe); sotto diventano un'icona: tagliati a una lettera ("Codex R")
-// sembravano un difetto.
-function StatoAgenti({ vista, coda, onDiario, diarioAperto }: { vista: Vista; coda: Agente[]; onDiario: () => void; diarioAperto: boolean }) {
-  const [, setTic] = useState(0);
-  useEffect(() => {
-    if (!vista.parlante) return;
-    const t = setInterval(() => setTic((x) => x + 1), 1000);
-    return () => clearInterval(t);
-  }, [vista.parlante]);
-  return (
-    <button className="@container flex min-w-0 flex-[1_1_15rem] items-center gap-1.5 text-left" onClick={onDiario} aria-expanded={diarioAperto}>
-      <span className="sr-only">Apri il diario: </span>
-      {AGENTI.map((a) => {
-        const s = statoAgente(vista, a, coda);
-        const libero = s.testo === 'Libero';
-        // Le pillole che si stringono tengono almeno pallino, nome (e tempo) e tagliano il resto
-        // dentro di sé: prima il contenuto usciva e finiva sotto la pillola accanto. Chi lavora parte
-        // dalla sua larghezza (flex-auto), così nello spazio stretto cede in proporzione con "Risponde
-        // dopo" invece di restare al minimo.
-        return (
-          <span key={a} className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-[12px] leading-none ${s.vivo ? 'min-w-[7.5rem] flex-auto overflow-hidden bg-[#141518] text-white' : libero ? 'shrink-0 bg-cartaScura text-inchiostro' : 'shrink-0 bg-cartaScura text-inchiostro'}`} title={libero ? undefined : s.testo}>
-            <Pallino agente={a} vivo={s.vivo} />
-            <span className="shrink-0 font-titolo font-bold">{NOME[a]}</span>
-            {vista.parlante === a && vista.inizioTurno ? <span className="shrink-0 font-dati text-[10px] opacity-70">{durata(Date.now() - vista.inizioTurno)}</span> : null}
-            {libero ? <span className="sr-only">libero</span>
-              : s.vivo ? <span className="min-w-0 truncate text-[#d9dce0]">{s.testo}</span>
-              : <>
-                <span className="hidden whitespace-nowrap text-grafite @min-[20rem]:inline">{coda.includes(a) ? s.testo : 'Errore'}</span>
-                <span className="sr-only @min-[20rem]:hidden">{s.testo}</span>
-                {coda.includes(a)
-                  ? <Timer size={12} className="shrink-0 text-grafite @min-[20rem]:hidden" aria-hidden />
-                  : <X size={12} className="shrink-0 text-grafite @min-[20rem]:hidden" aria-hidden />}
-              </>}
-          </span>
-        );
-      })}
-      <ChevronDown size={14} className={`shrink-0 text-grafite transition-transform ${diarioAperto ? 'rotate-180' : ''}`} aria-hidden />
-    </button>
-  );
-}
-
 function Diario({ voci, onScheda }: { voci: VoceDiario[]; onScheda?: (a: Agente) => void }) {
   const schede = onScheda && (
     <div className="flex gap-1.5 px-1 pt-1.5">
@@ -146,10 +104,6 @@ function BollaUtente({ m, inInvio }: { m: Pick<MessaggioChat, 'testo' | 'ora' | 
   );
 }
 
-// La partita nata da una scheda: la dice il messaggio del motore scritto quando è partita.
-const partitaDellaScheda = (messaggi: MessaggioChat[], indice: number) =>
-  messaggi.find((x) => x.autore === 'motore' && x.evento?.tipo === 'avviata' && x.evento.proposta === indice)?.evento?.partita;
-
 // Lo stato di una partita in poche parole, da quello che dice l'archivio.
 function statoPartita(r: Riassunto | undefined): string {
   if (!r) return 'In partenza…';
@@ -167,70 +121,13 @@ function statoPartita(r: Riassunto | undefined): string {
   return 'In partenza…';
 }
 
-// La scheda compito proposta da un agente: un tocco su "Avvia" e parte la partita, una sola anche
-// premendo due volte. Dice "Avviato" solo quando il motore l'ha scritto in chat.
-function SchedaCompito({ chat, m, messaggi, partite, disabilitato, onApri }: {
-  chat: string; m: MessaggioChat; messaggi: MessaggioChat[]; partite: Riassunto[]; disabilitato?: string; onApri: (id: string) => void;
-}) {
-  const p = m.proposta!;
-  const [aperta, setAperta] = useState(false);
-  const [invio, setInvio] = useState(false);
-  const [errore, setErrore] = useState<string>();
-  const [confermata, setConfermata] = useState<string>();
-  const id = partitaDellaScheda(messaggi, m.indice) ?? confermata;
-  const r = id ? partite.find((x) => x.id === id) : undefined;
-  const avvia = () => {
-    setInvio(true);
-    setErrore(undefined);
-    api.avvia(chat, m.indice).then((x) => setConfermata(x.id), (e: Error) => setErrore(e.message)).finally(() => setInvio(false));
-  };
-  const produci = () => {
-    setInvio(true);
-    setErrore(undefined);
-    api.produci(id!, p.cartella ?? null).catch((e: Error) => setErrore(e.message)).finally(() => setInvio(false));
-  };
-  const daProdurre = r?.stato === 'concluso' && !r.produzione;
-  return (
-    <div className="mt-2 rounded-xl border border-[#141518] bg-[#f7f8f9] p-2.5">
-      <div className="flex items-center gap-1.5 font-dati text-[10.5px] uppercase tracking-wider text-grafite">
-        <ListChecks size={13} aria-hidden /> Compito · {p.dopo === 'produzione' ? 'piano, poi produzione' : 'solo il piano'}{p.cartella ? ` · cartella ${p.cartella}` : ''}
-      </div>
-      <div className="mt-0.5 font-titolo text-[14.5px] font-bold leading-snug">{p.titolo}</div>
-      <p className={`mt-1 whitespace-pre-wrap break-words text-[13px] leading-snug text-[#3a3d42] ${aperta ? '' : 'line-clamp-3'}`}>{p.obiettivo}</p>
-      <button className="mt-0.5 text-[12px] font-semibold underline decoration-[#b5f900] decoration-2" onClick={() => setAperta(!aperta)} aria-expanded={aperta}>
-        {aperta ? 'Meno' : 'Leggi tutto'}
-      </button>
-      {id ? (
-        <>
-          <div className="mt-2 flex items-center gap-1.5">
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#141518] px-2 py-1 font-titolo text-[11.5px] font-bold text-[#b5f900]"><Check size={13} /> Avviato</span>
-            <span className="min-w-0 text-[12px] leading-tight text-grafite">{statoPartita(r)}</span>
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            <button className="tasto !min-h-8 !px-2.5 text-[12.5px]" onClick={() => onApri(id)}>Apri la partita <ArrowUpRight size={14} /></button>
-            {daProdurre && <button className="tasto !min-h-8 !px-2.5 text-[12.5px]" onClick={produci} disabled={invio || !!disabilitato}><Factory size={14} /> Manda in produzione</button>}
-          </div>
-        </>
-      ) : (
-        <div className="mt-2 flex items-center gap-2">
-          <button className="tasto tasto-primario !min-h-9 !px-3.5" onClick={avvia} disabled={invio || !!disabilitato}>
-            {invio ? <LoaderCircle size={15} className="animate-spin" /> : <Play size={15} />} {invio ? 'Avvio…' : 'Avvia'}
-          </button>
-          <span className="text-[11.5px] leading-tight text-grafite">{disabilitato ?? 'Claude e Codex fanno il piano in una partita.'}</span>
-        </div>
-      )}
-      {errore && <p className="mt-1.5 text-[12.5px] text-[#9b2626]" role="alert">{errore}</p>}
-    </div>
-  );
-}
-
-// Cosa lavora adesso fuori dalla chat e cosa aspetta una decisione: di serie una riga
-// sola ("3 da decidere · 1 al lavoro"), l'elenco si apre a richiesta.
+// Cosa lavora adesso fuori dalla chat e cosa aspetta una decisione: l'elenco si apre toccando la
+// squadra in campo, in cima alla chat.
 type VoceLavori = { r: Riassunto; attivo: boolean; aspetta: boolean };
 function lavoriDellaChat(partite: Riassunto[]): VoceLavori[] {
   const giorno = Date.now() - 24 * 3600_000;
   return partite.map((r) => {
-    const attivo = r.inCorso || r.stato === 'in_corso' || r.stato === 'sintesi' || r.produzione === 'in_lavorazione' || r.produzione === 'collaudo';
+    const attivo = lavoroAttivo(r);
     const aspetta = !attivo && new Date(r.aggiornato).getTime() > giorno
       && (r.stato === 'errore' || r.stato === 'in_pausa' || (r.stato === 'concluso' && !r.produzione) || r.produzione === 'errore' || (r.produzione === 'pronta' && r.collaudo === false));
     return { r, attivo, aspetta };
@@ -239,18 +136,44 @@ function lavoriDellaChat(partite: Riassunto[]): VoceLavori[] {
     .sort((a, b) => Number(b.aspetta) - Number(a.aspetta));
 }
 
-function RiassuntoLavori({ voci, aperto, onApri }: { voci: VoceLavori[]; aperto: boolean; onApri: () => void }) {
-  if (!voci.length) return null;
-  const decidere = voci.filter((x) => x.aspetta).length;
-  const lavoro = voci.length - decidere;
+// La squadra in campo, come le icone dei personaggi in un gioco: Claude e Codex sempre, poi chi
+// lavora adesso ai lavori di questa chat. Chi lavora ha l'anello lime e due parole su cosa fa. Un
+// tocco apre il diario e l'elenco dei lavori.
+function SquadraInCampo({ vista, coda, inCampo, aperto, onApri }: { vista: Vista; coda: Agente[]; inCampo: InCampo[]; aperto: boolean; onApri: () => void }) {
+  const [, setTic] = useState(0);
+  useEffect(() => {
+    if (!vista.parlante) return;
+    const t = setInterval(() => setTic((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [vista.parlante]);
+  const capo = (a: Agente): InCampo & { vivo: boolean } => {
+    if (vista.parlante === a) {
+      const t = statoAgente(vista, a, coda).testo;
+      return { id: a, nome: NOME[a], azione: t === 'Ci sta pensando' ? 'pensa' : t === 'Scrive la risposta' ? 'scrive' : t.split(' ').slice(0, 2).join(' ').toLowerCase(), vivo: true };
+    }
+    const altrove = inCampo.find((x) => x.id === a);
+    if (altrove) return { ...altrove, vivo: true };
+    return { id: a, nome: NOME[a], azione: coda.includes(a) ? 'dopo' : vista.fase[a] === 'errore' ? 'errore' : 'libero', vivo: false };
+  };
+  const altri = [...new Map(inCampo.filter((x) => x.id !== 'claude' && x.id !== 'codex').map((x) => [x.id, x])).values()];
+  const membri = [capo('claude'), capo('codex'), ...altri.map((x) => ({ ...x, vivo: true }))];
   return (
-    <button className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[12px] leading-none ${aperto ? 'border-[#141518] bg-white' : 'border-bordo bg-white hover:border-[#c4c8ce]'}`} onClick={onApri} aria-expanded={aperto} aria-controls="lavori-chat">
-      {lavoro > 0 && <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-[#b5f900] ring-1 ring-[#141518]" aria-hidden />}
-      <span className="font-titolo font-semibold">{[decidere ? `${decidere} da decidere` : '', lavoro ? `${lavoro} al lavoro` : ''].filter(Boolean).join(' · ')}</span>
-      <ChevronRight size={13} className={`shrink-0 text-grafite transition-transform ${aperto ? 'rotate-90' : ''}`} aria-hidden />
+    <button className="scorri flex w-full items-start gap-2.5 overflow-x-auto pb-0.5 text-left" onClick={onApri} aria-expanded={aperto} aria-label="La squadra: apri il diario e i lavori">
+      {membri.map((x) => (
+        <span key={x.id} className="w-14 shrink-0 text-center">
+          <span className={`relative mx-auto block w-fit rounded-[14px] ${x.vivo ? 'ring-[3px] ring-[#b5f900] ring-offset-1 ring-offset-white shadow-[0_0_0_4.5px_#141518]' : 'opacity-60 grayscale'}`}>
+            <Avatar id={x.id} dimensione={40} />
+            {x.vivo && <span className="absolute -bottom-1 -right-1 h-3 w-3 animate-pulse rounded-full border-2 border-white bg-[#b5f900] shadow-[0_0_0_1px_#141518]" aria-hidden />}
+          </span>
+          <span className="mt-1.5 block truncate font-titolo text-[11px] font-semibold leading-tight">{x.nome}</span>
+          <span className={`block truncate font-dati text-[9.5px] leading-tight ${x.vivo ? 'text-inchiostro' : 'text-grafite'}`}>{x.azione}</span>
+        </span>
+      ))}
+      {vista.parlante && vista.inizioTurno ? <span className="ml-auto self-center font-dati text-[10.5px] text-grafite">{durata(Date.now() - vista.inizioTurno)}</span> : null}
     </button>
   );
 }
+
 
 function Lavori({ voci, onApri }: { voci: VoceLavori[]; onApri: (id: string) => void }) {
   return (
@@ -420,6 +343,7 @@ const SUL_COMPUTER = () => window.matchMedia('(pointer: fine)').matches;
 function Composer(op: {
   campo: Campo; disabilitato?: string; occupato: boolean; modoVoce: ModoVoce; chi: Destinatari; setChi: (c: Destinatari) => void;
   onStop?: () => void; compatto?: boolean;
+  allegati?: ReactNode; onFile?: (f: File[]) => void;
 }) {
   const { testo, setTesto, setDaVoce, invio, voce } = op.campo;
   const area = useRef<HTMLTextAreaElement>(null);
@@ -444,8 +368,21 @@ function Composer(op: {
   const microfono = op.modoVoce === 'browser' ? puoDettare() : puoRegistrare();
   const errore = voce.errore ?? op.campo.avvisoVoce;
 
+  // Un file trascinato sul campo o incollato (una schermata copiata) diventa un allegato.
+  const daFuori = (lista: FileList | null | undefined) => {
+    const f = [...(lista ?? [])];
+    if (!f.length || !op.onFile) return false;
+    op.onFile(f);
+    return true;
+  };
+
   return (
-    <div className="flex flex-col gap-1.5">
+    <div
+      className="flex flex-col gap-1.5"
+      onDragOver={op.onFile ? (e) => { if (e.dataTransfer.types.includes('Files')) e.preventDefault(); } : undefined}
+      onDrop={op.onFile ? (e) => { if (daFuori(e.dataTransfer.files)) e.preventDefault(); } : undefined}
+    >
+      {op.allegati}
       {errore && (
         <div className="flex items-start gap-2 rounded-xl border border-[#141518] bg-white px-3 py-2 text-[13px]" role="alert">
           <span className="flex-1">{errore}</span>
@@ -486,12 +423,14 @@ function Composer(op: {
         </div>
       ) : (
         <div className="flex items-end gap-1.5 rounded-2xl border border-bordo bg-white p-1.5 shadow-[0_2px_0_#e2e4e8] focus-within:border-[#141518]">
+          {op.onFile && <Graffetta onFile={op.onFile} disabilitato={!!op.disabilitato} />}
           <textarea
             ref={area}
             rows={1}
             value={testo}
             onChange={(e) => { setTesto(e.target.value); if (!e.target.value) setDaVoce(false); }}
             onKeyDown={tasti}
+            onPaste={op.onFile ? (e) => { if (daFuori(e.clipboardData.files)) e.preventDefault(); } : undefined}
             placeholder={op.disabilitato ?? (op.chi === 'entrambi' ? 'Scrivi a Claude e Codex…' : `Scrivi a ${NOME[op.chi as Agente]}…`)}
             disabled={!!op.disabilitato}
             maxLength={8000}
@@ -644,6 +583,7 @@ export interface PropsChat {
   onScheda?: (a: Agente) => void; // la scheda dell'agente: cosa fa, cosa ha usato, le sue skill
   onChiudiErrore?: () => void;
   onCartelle?: () => void;
+  ufficio?: ComandiUfficio; // sul computer largo: il riquadro dell'ufficio 3D accanto alla plancia
 }
 
 export function Chat(p: PropsChat) {
@@ -656,7 +596,15 @@ export function Chat(p: PropsChat) {
   const [elenco, setElenco] = useState(false);
   const [menu, setMenu] = useState(false);
   const [diario, setDiario] = useState(false);
-  const [lavoriAperti, setLavoriAperti] = useState(false);
+  const [foglio, setFoglio] = useState<{ id: string; conProduzione: boolean } | null>(null);
+  // Chi lavora adesso, missione per missione (l'indice è quello della scheda in chat).
+  const [inCampo, setInCampo] = useState<Record<number, InCampo[]>>({});
+  const segnaInCampo = useCallback((indice: number, membri: InCampo[]) => setInCampo((x) => {
+    if (!membri.length && !x[indice]) return x;
+    const y = { ...x };
+    if (membri.length) y[indice] = membri; else delete y[indice];
+    return y;
+  }), []);
   // Tempi e token sotto ogni risposta: nascosti di serie, sempre visibili a scelta.
   const [dettagli, setDettagli] = preferenza<'si' | 'no'>('ambo.dettagli', 'no');
   const [compito, setCompito] = useState(false);
@@ -752,19 +700,62 @@ export function Chat(p: PropsChat) {
   };
 
   const campo = usaCampo(modo, voceSulPc, invia);
+  const allegati = usaAllegati(p.id);
+  // Senza chat ancora aperta, il primo file la crea: gli allegati appartengono sempre a una chat.
+  const allega = disabilitato ? undefined : (f: File[]) => void (async () => {
+    let id = p.id;
+    if (!id) {
+      try {
+        id = (await api.creaChat({ chi })).id;
+        p.onApri(id);
+      } catch (e) {
+        setErrore((e as Error).message);
+        return;
+      }
+    }
+    await allegati.aggiungi(f, id);
+  })();
   const lavori = useMemo(() => lavoriDellaChat(p.partite), [p.partite]);
   const vuota = !messaggi.length && !inInvio;
   const ultimaRisposta = messaggi.findLast((m) => m.autore !== 'utente' && !m.passa);
   const scheda = (m: MessaggioChat) => (m.proposta && d
-    ? <SchedaCompito chat={d.id} m={m} messaggi={messaggi} partite={p.partite} disabilitato={disabilitato} onApri={p.onPartita} />
+    ? <CartaLavoro chat={d.id} m={m} messaggi={messaggi} partite={p.partite} disabilitato={disabilitato}
+        onDettagli={(id) => setFoglio({ id, conProduzione: m.proposta!.dopo === 'produzione' })}
+        onChiediModifica={(titolo) => { campo.setTesto(`Su «${titolo}»: `); setTimeout(() => campo.fuoco.current(), 30); }}
+        onInCampo={segnaInCampo} />
     : undefined);
+  const missioni = messaggi.filter((x) => x.proposta).map((x) => {
+    const idP = partitaDellaScheda(messaggi, x.indice);
+    const r = idP ? p.partite.find((y) => y.id === idP) : undefined;
+    return { indice: x.indice, titolo: x.proposta!.titolo, conProduzione: x.proposta!.dopo === 'produzione', r };
+  }).filter((x): x is typeof x & { r: Riassunto } => !!x.r);
+  // Con l'ufficio 3D grande, a destra sopra l'ufficio: quelle al lavoro e l'ultima finita, al massimo tre.
+  const plancia = [...missioni.filter((x) => lavoroAttivo(x.r)), ...missioni.filter((x) => !lavoroAttivo(x.r)).slice(-1)].slice(0, 3);
+  const membriInCampo = Object.values(inCampo).flat();
+  // La plancia del computer: tutti i lavori di questa chat (prima quelli al lavoro, poi i più nuovi) e
+  // gli ultimi delle altre chat che stanno lavorando o hanno prodotto qualcosa.
+  const recente = (a: { r: Riassunto }, b: { r: Riassunto }) => Number(lavoroAttivo(b.r)) - Number(lavoroAttivo(a.r)) || b.r.aggiornato.localeCompare(a.r.aggiornato);
+  // Anche le partite avviate con "Trasforma in compito" sono di questa chat, pur senza una scheda.
+  const senzaScheda = p.partite.filter((r) => !!d && r.daChat === d.id && !missioni.some((x) => x.r.id === r.id));
+  const inPlancia: LavoroInPlancia[] = [
+    ...missioni.map((x) => ({ r: x.r, titolo: x.titolo, conProduzione: x.conProduzione })),
+    ...senzaScheda.map((r) => ({ r, titolo: r.domanda, conProduzione: !!r.produzione })),
+  ].sort(recente);
+  const altriInPlancia: LavoroInPlancia[] = p.partite
+    .filter((r) => !inPlancia.some((x) => x.r.id === r.id) && (!!r.produzione || lavoroAttivo(r)))
+    .map((r) => ({ r, titolo: r.domanda, conProduzione: !!r.produzione }))
+    .sort(recente)
+    .slice(0, 8);
+  // I fatti del motore su un lavoro di questa chat (avviata, conclusa, produzione) stanno già nella sua
+  // carta, che si aggiorna: in chat non si ripetono. Gli errori sì: la carta non dice il motivo.
+  const nellaCarta = (m: MessaggioChat) => m.autore === 'motore' && m.evento?.proposta !== undefined && m.evento.tipo !== 'errore' && messaggi.some((x) => x.indice === m.evento!.proposta && x.proposta);
 
   // Sul telefono con l'ufficio aperto: un foglio in basso con lo stato e il campo.
   if (p.compatta) {
     return (
       <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-10 flex flex-col gap-2 rounded-t-2xl border-t border-bordo bg-white/95 p-2.5 pb-[max(0.6rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_rgba(10,12,16,0.12)] backdrop-blur">
         <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1"><StatoAgenti vista={p.vista} coda={coda} onDiario={() => setDiario(!diario)} diarioAperto={diario} /></div>
+          <div className="min-w-0 flex-1"><SquadraInCampo vista={p.vista} coda={coda} inCampo={membriInCampo} aperto={diario} onApri={() => setDiario(!diario)} /></div>
           <button className="tasto tasto-icona !min-h-9" onClick={p.onChat} aria-label="Torna alla chat"><MessageSquare size={18} /></button>
         </div>
         {diario && <Diario voci={p.vista.diario} onScheda={p.onScheda} />}
@@ -786,7 +777,6 @@ export function Chat(p: PropsChat) {
           <h1 className="truncate font-titolo text-[15px] font-bold leading-tight">{d?.config.domanda ?? 'Nuova chat'}</h1>
           {d?.config.memoria === false && <p className="truncate text-[11.5px] text-grafite">Note spente</p>}
         </div>
-        {p.onUfficio && <button className="tasto tasto-icona !min-h-9 md:hidden" onClick={p.onUfficio} aria-label="Guarda l'ufficio 3D"><Box size={18} /></button>}
         <div className="relative">
           <button className="tasto tasto-icona !min-h-9" onClick={() => setMenu(!menu)} aria-label="Altro" aria-expanded={menu} aria-haspopup="menu"><Ellipsis size={18} /></button>
           {menu && (
@@ -794,6 +784,7 @@ export function Chat(p: PropsChat) {
               <div className="fixed inset-0 z-20" onClick={() => setMenu(false)} />
               <div className="pannello absolute right-0 top-12 z-30 w-64 p-1.5" role="menu">
                 <Voce icona={<Plus size={16} />} onClick={() => { setMenu(false); p.onNuova(); }}>Nuova chat</Voce>
+                {p.onUfficio && <div className="md:hidden"><Voce icona={<Box size={16} />} onClick={() => { setMenu(false); p.onUfficio!(); }}>Guarda l'ufficio 3D</Voce></div>}
                 <Voce icona={<ListChecks size={16} />} onClick={() => { setMenu(false); setCompito(true); }} disabled={!d || !messaggi.length || !!disabilitato}>Trasforma in compito</Voce>
                 <Voce icona={<NotebookPen size={16} />} onClick={() => azione(async () => { const r = await api.salvaNota(d!.id); setFatto(`Salvata come nota: ${r.nota}`); })} disabled={!d || !messaggi.length || !!disabilitato}>Salva come nota</Voce>
                 <Voce icona={<Timer size={16} />} onClick={() => { setMenu(false); setDettagli(dettagli === 'si' ? 'no' : 'si'); }}>{dettagli === 'si' ? 'Nascondi tempi e token' : 'Mostra tempi e token'}</Voce>
@@ -808,12 +799,13 @@ export function Chat(p: PropsChat) {
       </header>
 
       <div className="border-b border-bordo bg-white px-2 pb-2 pt-0.5">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <StatoAgenti vista={p.vista} coda={coda} onDiario={() => setDiario(!diario)} diarioAperto={diario} />
-          <RiassuntoLavori voci={lavori} aperto={lavoriAperti} onApri={() => setLavoriAperti(!lavoriAperti)} />
-        </div>
-        {diario && <Diario voci={p.vista.diario} onScheda={p.onScheda} />}
-        {lavoriAperti && lavori.length > 0 && <Lavori voci={lavori} onApri={p.onPartita} />}
+        <SquadraInCampo vista={p.vista} coda={coda} inCampo={membriInCampo} aperto={diario} onApri={() => setDiario(!diario)} />
+        {diario && (
+          <>
+            <Diario voci={p.vista.diario} onScheda={p.onScheda} />
+            {lavori.length > 0 && <Lavori voci={lavori} onApri={p.onPartita} />}
+          </>
+        )}
       </div>
 
       <div
@@ -843,7 +835,7 @@ export function Chat(p: PropsChat) {
             {messaggi.map((m) => (m.autore === 'utente'
               ? <BollaUtente key={m.indice} m={m} />
               : m.autore === 'motore'
-                ? <BollaMotore key={m.indice} m={m} onApri={p.onPartita} />
+                ? (nellaCarta(m) ? null : <BollaMotore key={m.indice} m={m} onApri={p.onPartita} />)
                 : <BollaAgente key={m.indice} m={m} leggendo={leggendo === m.indice} onLeggi={() => leggiQuesto(m)} scheda={scheda(m)} dettagli={dettagli === 'si'} />))}
             {inInvio && <BollaUtente m={{ ...inInvio, ora: new Date().toISOString() }} inInvio />}
             {p.vista.parlante && p.vista.ruolo === 'chat' && <BollaDalVivo vista={p.vista} />}
@@ -872,9 +864,33 @@ export function Chat(p: PropsChat) {
             <button className="text-grafite" onClick={() => { setErrore(undefined); setFatto(undefined); p.onChiudiErrore?.(); }} aria-label="Chiudi"><X size={16} /></button>
           </div>
         )}
-        <Composer campo={campo} disabilitato={disabilitato} occupato={occupato} modoVoce={modo} chi={chi} setChi={setChi} onStop={d ? () => azione(() => api.pausa(d.id)) : undefined} />
+        <Composer
+          campo={campo} disabilitato={disabilitato} occupato={occupato} modoVoce={modo} chi={chi} setChi={setChi} onStop={d ? () => azione(() => api.pausa(d.id)) : undefined}
+          allegati={<BarraAllegati chat={p.id} s={allegati} />} onFile={allega}
+        />
       </div>
 
+      {foglio && (
+        <FoglioLavoro
+          id={foglio.id}
+          r={p.partite.find((x) => x.id === foglio.id)}
+          conProduzione={foglio.conProduzione}
+          onChiudi={() => setFoglio(null)}
+          onUfficio={() => { const id = foglio.id; setFoglio(null); p.onPartita(id); }}
+        />
+      )}
+      {p.ufficio && !p.ufficio.grande && (
+        <Plancia questa={inPlancia} altri={altriInPlancia} ufficio={p.ufficio} onApri={(x) => setFoglio({ id: x.r.id, conProduzione: x.conProduzione })}>
+          <Diario voci={p.vista.diario} onScheda={p.onScheda} />
+        </Plancia>
+      )}
+      {p.ufficio?.grande && !foglio && <UfficioGrande u={p.ufficio} />}
+      {/* Con l'ufficio grande, a destra sopra l'ufficio: le missioni di questa chat, sempre a vista. */}
+      {p.ufficio?.grande && !foglio && plancia.length > 0 && (
+        <div className="pointer-events-auto fixed bottom-3 right-3 z-20 flex w-[380px] flex-col gap-2" aria-label="Lavori di questa chat">
+          {plancia.map((x) => <MissioneBreve key={x.indice} titolo={x.titolo} r={x.r} conProduzione={x.conProduzione} onApri={() => setFoglio({ id: x.r.id, conProduzione: x.conProduzione })} />)}
+        </div>
+      )}
       {elenco && <ElencoChat chats={p.chats} id={p.id} onApri={(id) => { setElenco(false); p.onApri(id); }} onNuova={() => { setElenco(false); p.onNuova(); }} onPartite={() => { setElenco(false); p.onPartite(); }} onChiudi={() => setElenco(false)} />}
       {compito && d && <FinestraCompito d={d} onChiudi={() => setCompito(false)} onAvviata={() => { setCompito(false); setFatto('Partita avviata: la trovi qui in chat, con il suo stato.'); }} />}
     </section>

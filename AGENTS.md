@@ -124,7 +124,8 @@ motore/            il motore Node: server, chat, partite, produzione
   chat.ts          regole della chat (chi risponde, PASSO, schede compito)
   prompt.ts        i messaggi per i capi reparto e per gli assistenti nelle riunioni
   squadra.ts       catalogo degli assistenti (di serie e dell'utente), procedure, XP e livelli, tetti
-  produzione.ts    cantiere, pacchetti, collaudo, revisioni, correzioni
+  produzione.ts    cantiere, pacchetti (anche insieme), collaudo, revisioni, correzioni
+  allegati.ts      allegati delle chat: tipo dai byte, metadati tolti, limiti, copia nel cantiere
   procedure/       procedure di serie (JSON): sito web, documento, analisi, codice, su misura
   agenti/          come si lanciano le CLI: claude.ts, codex.ts, cantiere.ts
   processo.ts      avvio dei processi e pulizia dell'ambiente
@@ -146,10 +147,10 @@ web/               dashboard React + Three (Vite, Tailwind)
 test/              test con node:test
 strumenti/         script di servizio
 docs/              documentazione
-dati/              creata all'avvio, fuori dal repository: chat, partite, cantieri, note salvate, squadra.json, procedure dell'utente
+dati/              creata all'avvio, fuori dal repository: chat, partite, cantieri, allegati, note salvate, squadra.json, procedure dell'utente
 ```
 
-I nomi dei singoli file possono cambiare: in caso di dubbio cerca nel codice. Le variabili `AMBO_*` non si leggono tutte in `impostazioni.ts`: `AMBO_DATI` e `AMBO_CONSENTI_API` stanno in `ambiente.ts` (e i controlli sulle chiavi API usano quella copia), `AMBO_PORTA` in `server.ts`, quelle della voce in `voce.ts`, `AMBO_AGENTI` in `squadra.ts`, `AMBO_MOTORE` (solo sviluppo, il motore a cui il server di Vite passa `/api`, solo indirizzi locali) in `web/vite.config.ts`, `AMBO_PAROLE_VIETATE` in `strumenti/controllo-sterile.ts`.
+I nomi dei singoli file possono cambiare: in caso di dubbio cerca nel codice. Le variabili `AMBO_*` non si leggono tutte in `impostazioni.ts`: `AMBO_DATI` e `AMBO_CONSENTI_API` stanno in `ambiente.ts` (e i controlli sulle chiavi API usano quella copia), `AMBO_PORTA` in `server.ts`, quelle della voce in `voce.ts`, `AMBO_AGENTI` in `squadra.ts`, `AMBO_INSIEME` in `produzione.ts`, `AMBO_MOTORE` (solo sviluppo, il motore a cui il server di Vite passa `/api`, solo indirizzi locali) in `web/vite.config.ts`, `AMBO_PAROLE_VIETATE` in `strumenti/controllo-sterile.ts`.
 
 ## Comandi
 

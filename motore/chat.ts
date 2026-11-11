@@ -33,6 +33,13 @@ export function ultimaRisposta(d: Dibattito, agente: Agente): number {
   return n;
 }
 
+// L'ultimo messaggio che chiede una risposta: dell'utente, o un fatto del motore che chiede il
+// riepilogo. È il limite di uno stop: fermare la chat ferma anche il riepilogo.
+export const ultimoDaRispondere = (d: Dibattito): number => {
+  const m = messaggiChat(d).findLast((x) => x.autore === 'utente' || (x.autore === 'motore' && !!x.a?.length));
+  return m?.indice ?? 0;
+};
+
 export const ultimoDellUtente = (d: Dibattito): number => {
   const m = messaggiChat(d).findLast((x) => x.autore === 'utente');
   return m?.indice ?? 0;
@@ -42,7 +49,8 @@ export const ultimoDellUtente = (d: Dibattito): number => {
 // messaggio ancora senza risposta: di serie prima chi apre, poi l'altro, che legge anche il primo.
 export function prossimaRisposta(d: Dibattito): { agente: Agente; fino: number } | null {
   const salta = d.saltaFino ?? 0;
-  const dallUtente = messaggiChat(d).filter((m) => m.autore === 'utente' && m.indice > salta);
+  // I fatti del motore che chiedono un riepilogo (un lavoro finito) contano come un messaggio dell'utente.
+  const dallUtente = messaggiChat(d).filter((m) => (m.autore === 'utente' || (m.autore === 'motore' && !!m.a?.length)) && m.indice > salta);
   for (const m of dallUtente) {
     for (const agente of m.a ?? []) {
       if (ultimaRisposta(d, agente) >= m.indice) continue;
@@ -143,7 +151,7 @@ function intestazione(d: Dibattito, agente: Agente): string {
 
 // Il messaggio per l'agente. vede: l'ultimo messaggio incluso, da segnare come già letto.
 // stato: cosa c'è davvero nel programma adesso (compiti di questa chat, lavori in corso), dal motore.
-export function promptChat(d: Dibattito, agente: Agente, fino: number, stato?: string): { testo: string; vede: number } {
+export function promptChat(d: Dibattito, agente: Agente, fino: number, stato?: string, fineLavoro?: string, allegati?: string): { testo: string; vede: number } {
   const tutti = messaggiChat(d).filter((m) => !m.passa);
   const vede = messaggiChat(d).at(-1)?.indice ?? 0;
   const parti: string[] = [];
@@ -157,17 +165,49 @@ export function promptChat(d: Dibattito, agente: Agente, fino: number, stato?: s
     if (nuovi.length) parti.push(`Nuovi messaggi nella chat:\n\n${coda(nuovi, STORIA_MAX).testo}`);
   }
   if (stato) parti.push(`STATO DEL PROGRAMMA, letto adesso dal motore (è la verità su cosa esiste e cosa gira):\n${stato}`);
+  if (allegati) parti.push(`${allegati}\nUna partita avviata da questa chat ne prende una copia: in riunione si leggono i testi e le descrizioni, in produzione i file sono nel cantiere.`);
 
   const altroAg = altro(agente);
   const giaRisposto = ultimaRisposta(d, altroAg) >= fino;
   const ultimo = messaggiChat(d).find((m) => m.indice === fino);
   const anche = ultimo?.a?.includes(altroAg) && !giaRisposto;
-  if (giaRisposto) {
+  if (ultimo?.autore === 'motore') {
+    parti.push(fineLavoro ? `DATI DEL LAVORO APPENA FINITO, letti adesso dal motore:\n${fineLavoro}` : '');
+    parti.push([
+      'È appena finito un lavoro nato da questa chat (il messaggio del Motore qui sopra). Scrivi all\'utente il riepilogo di fine lavoro, come un collega che ha appena consegnato:',
+      '- in una frase, cosa è pronto, oppure perché si è fermato;',
+      '- dove sono i file: la cartella del cantiere (dall\'app la apre con «Apri la cartella» nella carta del lavoro);',
+      '- cosa resta da fare o da controllare, se c\'è (problemi del collaudo, ritocchi alla sintesi);',
+      '- cosa conviene fare adesso, in una riga.',
+      'Al massimo 6 righe, senza titoli. Usa solo i dati qui sopra e non inventare. Se serve un lavoro nuovo, per esempio correggere i problemi del collaudo, puoi proporre una scheda compito.',
+    ].join('\n'));
+  } else if (giaRisposto) {
     parti.push(`${NOME[altroAg]} ha già risposto qui sopra. Non ripetere: aggiungi solo quello che manca o correggi quello che non regge. Se non hai niente di utile da aggiungere, rispondi solo PASSO.`);
   } else {
     parti.push(`Rispondi all\'utente.${anche ? ` Dopo di te risponderà anche ${NOME[altroAg]}.` : ''}`);
   }
   return { testo: parti.join('\n\n'), vede };
+}
+
+// I dati di un lavoro finito per il riepilogo in chat: esito, sintesi in breve, file, cartella, collaudo.
+export function datiFineLavoro(p: Dibattito, titolo: string): string {
+  const pr = p.produzione;
+  const righe = [`Lavoro: «${titolo}».`];
+  righe.push(`Riunione: ${p.esito ?? p.stato}, ${p.turni.length} interventi.`);
+  if (p.sintesi) righe.push(`Piano in breve: ${p.sintesi.testo.conclusione.replace(/\s+/g, ' ').slice(0, 700)}`);
+  if (p.verifica && !p.verifica.testo.approvata) righe.push(`Ritocchi di ${NOME[p.verifica.revisore]} alla sintesi: ${p.verifica.testo.correzioni.length} (${p.verifica.testo.correzioni.map((x) => x.slice(0, 120)).slice(0, 3).join(' | ')}).`);
+  if (!pr) {
+    righe.push('Produzione: non avviata. Si avvia dalla carta del lavoro con «Manda in produzione».');
+    return righe.join('\n');
+  }
+  righe.push(`Produzione: ${pr.stato}${pr.fine ? `, ${Math.max(1, Math.round((Date.parse(pr.fine) - Date.parse(pr.inizio)) / 60_000))} minuti` : ''}${pr.pacchetti?.length ? `, ${pr.pacchetti.length} pacchetti` : ''}.`);
+  if (pr.errore) righe.push(`Errore: ${pr.errore.split('\n')[0]}`);
+  righe.push(`Cartella del cantiere: ${pr.cantiere}`);
+  righe.push(`File (${pr.file.length}): ${pr.file.slice(0, 15).map((f) => f.percorso).join(', ')}${pr.file.length > 15 ? ', …' : ''}`);
+  if (pr.collaudo) {
+    righe.push(pr.collaudo.approvato ? 'Collaudo: superato (Codex legge i file, non li prova).' : `Collaudo: respinto, ${pr.collaudo.problemi.length} problemi: ${pr.collaudo.problemi.map((x) => x.replace(/\s+/g, ' ').slice(0, 160)).slice(0, 5).join(' | ')}`);
+  }
+  return righe.join('\n');
 }
 
 // "PASSO" (anche con un punto o in minuscolo): niente da aggiungere.

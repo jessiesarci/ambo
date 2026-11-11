@@ -7,6 +7,7 @@ import { descriviFonti, IMPOSTAZIONI, noteAttive, presentazioneUtente } from './
 import {
   MAX_INCARICHI_INTERVENTO, MAX_INCARICHI_RIUNIONE, MAX_PACCHETTI, SQUADRA, SU_MISURA, type Catalogo, type VoceCatalogo,
 } from './squadra.ts';
+import { MAX_INSIEME } from './produzione.ts';
 import { altro, NOME, type Agente, type Dibattito, type Esito, type Incarico, type Sintesi, type Turno } from './tipi.ts';
 
 // Il tetto di sicurezza della riunione: non è un numero di round e agli agenti si dice solo
@@ -104,10 +105,10 @@ function squadra(c: Catalogo): string {
   return [
     'LA SQUADRA: gli assistenti che potete chiamare durante la riunione. Ognuno lavora da solo con le vostre stesse regole (sola lettura; note dell\'utente e web solo se attivi), non vede la riunione e consegna un rapporto. "produzione" vuol dire che può anche costruire pacchetti nel cantiere.',
     ...c.assistenti.map((a) => `- ${a.id}: ${a.nome !== a.id ? `${a.nome}, ` : ''}${a.ruolo}${a.produzione ? ' · produzione' : ''}. ${a.descrizione}`),
-    'PROCEDURE: i modi di lavorare già pronti, con l\'assistente di ogni passo (piano: incarico in riunione; produzione: pacchetto; collaudo: revisione dei file dopo il collaudo di Codex). Sceglietene una per il tipo di lavoro, oppure "su-misura".',
+    'PROCEDURE: i modi di lavorare già pronti, con l\'assistente di ogni passo (piano: incarico in riunione; produzione: pacchetto; collaudo: revisione dei file insieme al collaudo di Codex). Sceglietene una per il tipo di lavoro, oppure "su-misura".',
     ...c.procedure.map((p) => `- ${p.id}: ${p.nome}, per ${p.quando || 'qualsiasi lavoro'}.${p.passi.length ? ` Passi: ${passi(p)}.` : ''}`),
     `INCARICHI: per affidare un lavoro scrivi nel campo "incarichi" [{"assistente": "<id>", "compito": "..."}]. Al massimo ${MAX_INCARICHI_INTERVENTO} per intervento e ${MAX_INCARICHI_RIUNIONE} in tutta la riunione, e ognuno consuma quota: chiedili solo quando servono davvero (un fatto da verificare, un conto, una bozza, un controllo del piano). Di solito il campo resta vuoto. Il compito deve stare in piedi da solo, perché l'assistente non vede la riunione. Il motore esegue gli incarichi dopo il tuo intervento, uno alla volta, e chi parla dopo riceve i rapporti sotto "RAPPORTI DELLA SQUADRA".`,
-    `PACCHETTI: in produzione costruiscono gli assistenti con "produzione" (${prod}), un pacchetto dopo l'altro nello stesso cantiere; ogni pacchetto vede i file dei precedenti. Nel piano dite chi fa cosa e in che ordine: alla fine la sintesi indica la procedura e divide il lavoro in pacchetti (al massimo ${MAX_PACCHETTI}).`,
+    `PACCHETTI: in produzione costruiscono gli assistenti con "produzione" (${prod}), nello stesso cantiere: i pacchetti indipendenti insieme (fino a ${MAX_INSIEME} nello stesso momento), gli altri dopo quelli da cui dipendono; ogni pacchetto vede i file di chi ha già finito. Nel piano dite chi fa cosa e cosa deve aspettare cosa: dividete il lavoro in parti che si costruiscono in parallelo, ognuna con i suoi file, e lasciate per ultimo solo quello che ha bisogno di tutto. Alla fine la sintesi indica la procedura e divide il lavoro in pacchetti (al massimo ${MAX_PACCHETTI}).`,
   ].join('\n');
 }
 
@@ -126,6 +127,7 @@ function intestazione(d: Dibattito, cat: Catalogo): string {
       : '',
     squadra(cat),
     d.dossier ? materiale(d) : '',
+    d.allegati?.testo ?? '',
     d.contestoChat ? contestoChat(d) : '',
     comeFunziona(d),
   ].filter(Boolean).join('\n\n');
@@ -137,7 +139,7 @@ function comeFunziona(d: Dibattito): string {
   const c = d.config;
   return [
     'COME FUNZIONA IL PROGRAMMA: questa riunione è già in corso nel motore, l\'utente non deve avviarla né ricopiarla. Alla fine uno di voi scrive la sintesi e l\'altro la verifica.',
-    `Poi la decisione può andare in produzione: gli assistenti di produzione (tutti con Claude) scrivono file in un cantiere, una cartella chiusa${c.cartella ? ` con una copia dei file di "${c.cartella}"` : ' vuota'}, un pacchetto dopo l'altro, senza eseguire comandi, senza web e senza toccare il programma in uso o altri progetti; Codex collauda leggendo i file, poi gli eventuali passi di collaudo della procedura li rivedono; se il collaudo respinge, si corregge e si ricontrolla (al massimo due volte).`,
+    `Poi la decisione può andare in produzione: gli assistenti di produzione (tutti con Claude) scrivono file in un cantiere, una cartella chiusa${c.cartella ? ` con una copia dei file di "${c.cartella}"` : ' vuota'}, i pacchetti indipendenti nello stesso momento, senza eseguire comandi, senza web e senza toccare il programma in uso o altri progetti; Codex collauda leggendo i file e, nello stesso momento, gli eventuali passi di collaudo della procedura li rivedono; se il collaudo respinge, si corregge e si ricontrolla (al massimo due volte).`,
     c.poiProduzione ? 'L\'utente ha chiesto che con l\'accordo pieno la produzione parta da sola.' : 'La produzione la avvia l\'utente dalla riunione conclusa.',
     'Fate un piano che si possa costruire così. Quello che richiede comandi, build, test, account o pubblicazione va scritto come passo per l\'utente (o per Claude Code sul suo PC), non promesso come fatto.',
   ].join(' ');
@@ -234,6 +236,7 @@ export function promptIncarico(d: Dibattito, inc: Incarico, a: VoceCatalogo): st
     c.ricercaWeb ? 'La ricerca web è attiva: usala per i fatti che cambiano nel tempo.' : 'La ricerca web è spenta.',
     noteAttive(c) ? 'Le note dell\'utente sono attive, in sola lettura (strumenti "memoria": cerca, leggi, elenco).' : 'Le note dell\'utente non sono attive in questa riunione.',
     d.dossier ? materiale(d) : '',
+    d.allegati?.testo ?? '',
     'Lavora ora e consegna il rapporto per i capi reparto: testo libero, al massimo circa 1500 parole.',
   ].filter(Boolean).join('\n\n');
 }
@@ -265,8 +268,8 @@ export function promptSintesi(d: Dibattito, relatore: Agente, cat: Catalogo, not
     '- decisioni: solo ciò che entrambi avete accettato esplicitamente nella riunione;',
     '- disaccordi: ogni punto rimasto aperto o su cui avete posizioni diverse, con la posizione di Claude e quella di Codex;',
     '- prossimi_passi: cosa conviene fare all\'utente;',
-    `- procedura: l'id della procedura che la produzione deve seguire, dall'elenco PROCEDURE (${cat.procedure.map((p) => p.id).join(', ')}), oppure "${SU_MISURA}". I suoi passi di collaudo rivedono i file dopo il collaudo di Codex;`,
-    `- pacchetti: il lavoro per la produzione diviso in pacchetti, nell'ordine in cui vanno costruiti (al massimo ${MAX_PACCHETTI}). Per ognuno: titolo breve, assistente (uno di questi: ${prod}) e obiettivo, cioè cosa deve consegnare, comprensibile senza leggere la riunione. Ogni pacchetto vede i file dei precedenti. Se la procedura ha passi di produzione, seguili. Lascialo vuoto se non c'è niente da costruire: se l'utente manda comunque la decisione in produzione, la costruiscono i passi di produzione della procedura, o se non ce ne sono Paolo (sviluppo).`,
+    `- procedura: l'id della procedura che la produzione deve seguire, dall'elenco PROCEDURE (${cat.procedure.map((p) => p.id).join(', ')}), oppure "${SU_MISURA}". I suoi passi di collaudo rivedono i file insieme al collaudo di Codex;`,
+    `- pacchetti: il lavoro per la produzione diviso in pacchetti, numerati da 1 (al massimo ${MAX_PACCHETTI}). Per ognuno: titolo breve, assistente (uno di questi: ${prod}), obiettivo, cioè cosa deve consegnare e in quali file, comprensibile senza leggere la riunione, e dipende, i numeri dei pacchetti che devono essere finiti prima (solo numeri più piccoli). Con dipende vuoto il pacchetto parte subito, insieme agli altri indipendenti (fino a ${MAX_INSIEME} nello stesso momento): dividi il lavoro in parti con file separati che si costruiscono in parallelo, e fai dipendere da tutti solo l'ultimo pacchetto, se deve unire o rivedere. Ogni pacchetto vede i file di chi ha già finito. Se la procedura ha passi di produzione, seguili. Lascialo vuoto se non c'è niente da costruire: se l'utente manda comunque la decisione in produzione, la costruiscono i passi di produzione della procedura, o se non ce ne sono Paolo (sviluppo).`,
     `Non inventare consenso: ${NOME[revisore]} verificherà la sintesi e i suoi rilievi finiranno nel documento.`,
     relatore === 'claude' ? SOLO_JSON : '',
   ].filter(Boolean).join('\n');

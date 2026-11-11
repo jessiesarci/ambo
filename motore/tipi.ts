@@ -1,4 +1,5 @@
 // Tipi condivisi tra motore, CLI e dashboard.
+import type { Allegato } from './allegati.ts';
 
 export type Agente = 'claude' | 'codex';
 export const AGENTI: readonly Agente[] = ['claude', 'codex'];
@@ -28,6 +29,9 @@ export interface PacchettoPiano {
   titolo: string;
   assistente: string;
   obiettivo: string;
+  // I numeri (da 1) dei pacchetti che devono essere finiti prima; vuoto: parte subito, insieme agli
+  // altri indipendenti. Manca nelle sintesi scritte prima: allora si va in fila.
+  dipende?: number[];
 }
 
 export interface Sintesi {
@@ -90,7 +94,7 @@ export interface Assistente {
 }
 
 // Una procedura (un workflow): i passi con l'assistente di ognuno. piano: incarico in riunione;
-// produzione: pacchetto nel cantiere; collaudo: revisione in sola lettura dopo il collaudo di Codex.
+// produzione: pacchetto nel cantiere; collaudo: revisione in sola lettura insieme al collaudo di Codex.
 export type FaseProcedura = 'piano' | 'produzione' | 'collaudo';
 export interface Procedura {
   id: string;
@@ -267,6 +271,8 @@ export interface Revisione {
 // Claude) costruiscono i pacchetti in una cartella tutta loro (il cantiere), Codex collauda.
 export interface Produzione {
   stato: StatoProduzione;
+  // Gli allegati dell'utente copiati nel cantiere prima dei costruttori (percorsi relativi).
+  allegati?: string[];
   // In ordine di esecuzione. Senza pacchetti nella sintesi è uno solo, di Paolo (sviluppo).
   // Manca nelle produzioni salvate prima della squadra.
   pacchetti?: Pacchetto[];
@@ -307,7 +313,7 @@ export interface MessaggioChat {
   autore: AutoreChat;
   testo: string;
   ora: string;
-  a?: Agente[]; // a chi chiede risposta l\'utente
+  a?: Agente[]; // a chi chiede risposta l'utente; in un fatto del motore, chi deve scrivere il riepilogo
   voce?: boolean; // dettato a voce
   risponde?: number;
   passa?: boolean; // l'agente non aveva niente da aggiungere a quanto già detto
@@ -338,6 +344,11 @@ export interface Dibattito {
   errore?: { messaggio: string; recuperabile: boolean; ora: string };
   chiamateFallite: { ora: string; agente: Agente; errore: string }[];
   dossier?: Dossier;
+  // Gli allegati della chat d'origine, copiati alla nascita della partita: l'elenco e la sezione per
+  // i prompt della riunione (testi tra delimitatori), letta una volta sola come il materiale.
+  allegati?: { elenco: Allegato[]; testo: string };
+  // Nelle chat: la firma degli allegati che ogni agente ha già visto.
+  allegatiVisti?: Partial<Record<Agente, string>>;
   produzione?: Produzione;
   // Solo per le chat.
   chat?: MessaggioChat[];

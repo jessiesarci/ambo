@@ -11,12 +11,14 @@
 Ambo è un programma che gira sul tuo PC e si usa dal browser. Ti fa chattare con **Claude Code** e **Codex** insieme, con i tuoi abbonamenti.
 
 - **Chat.** Scrivi un messaggio e rispondono tutti e due, uno dopo l'altro. Il secondo legge la risposta del primo e aggiunge solo quello che manca, oppure dice che non ha niente da aggiungere.
-- **Scheda compito.** Quando una cosa va fatta, un agente propone una scheda con il tasto **Avvia**.
+- **Allegati.** Dai ai lavori immagini, PDF e file di testo dal PC: in chat e in riunione gli agenti leggono i testi e le tue descrizioni, in produzione chi costruisce trova i file nel cantiere. Le foto perdono la posizione e gli altri metadati.
+- **Scheda compito.** Quando una cosa va fatta, un agente propone una scheda con il tasto **Avvia**. Dopo l'avvio diventa la carta del lavoro, con le tappe, chi lavora e, alla fine, il riepilogo scritto in chat.
 - **Riunione.** In una partita Claude e Codex fanno da capi reparto: parlano a turno e preparano insieme il piano, finché tutti e due lo sottoscrivono. Alla fine uno scrive la sintesi e l'altro la verifica. Ottieni un documento in markdown.
 - **Squadra.** Durante la riunione i capi possono affidare incarichi agli assistenti, scelti per il tipo di lavoro: 7 di serie (ricerca, analisi, architettura, testi, design, sviluppo, controllo qualità) e, se lo chiedi, i tuoi agenti di Claude Code. Ogni assistente ha un avatar, le sue skill, un livello da 1 a 10 con un titolo, i punti esperienza (XP) che guadagna lavorando e i badge dei traguardi raggiunti.
 - **Procedure.** Modi di lavorare già pronti (sito web, documento, analisi, codice, su misura) che dicono quale assistente fa cosa nel piano, nella produzione e nel collaudo. Puoi aggiungere le tue.
-- **Produzione.** La decisione diventa file in una cartella separata (il cantiere), come una catena di montaggio: gli assistenti costruiscono i pacchetti di lavoro uno dopo l'altro, Codex fa il collaudo e gli eventuali passi di collaudo della procedura rivedono i file. Se il collaudo non passa, si corregge.
-- **Ufficio 3D.** Un ufficio diviso in reparti, con gli omini dei capi reparto e degli assistenti: vedi chi pensa, chi cerca nelle note, chi scrive, chi lavora a un incarico. Nel magazzino la catena di montaggio segue la produzione stazione per stazione.
+- **Produzione.** La decisione diventa file in una cartella separata (il cantiere), come una catena di montaggio: gli assistenti costruiscono i pacchetti di lavoro, quelli indipendenti nello stesso momento, Codex fa il collaudo e gli eventuali passi di collaudo della procedura rivedono i file. Se il collaudo non passa, si corregge.
+- **Anteprime.** Sul computer, accanto alla chat, una plancia con i lavori della chat e gli ultimi delle altre, con la copertina di quello che hanno prodotto. Aprendo un lavoro vedi ogni file: le pagine come su un computer o su un telefono, i documenti impaginati, il codice.
+- **Ufficio 3D.** Un ufficio diviso in reparti, con gli omini dei capi reparto e degli assistenti: vedi chi pensa, chi cerca nelle note, chi scrive, chi lavora a un incarico. Nel magazzino la catena di montaggio segue la produzione stazione per stazione. Sul computer sta in un riquadro accanto alla plancia e si ingrandisce con un tasto.
 - **Voce** (facoltativa). Detti i messaggi; la trascrizione può restare sul PC.
 
 Il programma non ha una parte online, non ha account suoi e non raccoglie dati di uso. Il server ascolta solo sul tuo PC (127.0.0.1).
@@ -299,6 +301,7 @@ La configurazione sta nel file `.env` nella cartella del programma. Copialo da [
 | `AMBO_AGENTI` | Solo con `AMBO_AMBIENTE=1`: la cartella da cui prendere gli agenti della squadra, oppure `0` per non prenderne nessuno | `~/.claude/agents` |
 | `AMBO_CONSENTI_API` | Con `1` accetta anche il login con chiave API (fatturazione a consumo), per Claude Code e per Codex. Non permette i crediti extra di Claude: quelli il programma li ferma sempre | spento |
 | `AMBO_PORTA` | Porta del server | `4317` |
+| `AMBO_INSIEME` | Quanti pacchetti di produzione si costruiscono nello stesso momento, da 1 (uno dopo l'altro) a 4. Più pacchetti insieme consumano più quota nello stesso momento | `3` |
 | `AMBO_DATI` | Cartella dei dati. Non metterla dentro `AppData` su Windows: lì Claude non può scrivere e la produzione si ferma con un messaggio (vale anche se tutto il programma sta dentro `AppData`) | `./dati` |
 | `CLAUDE_BIN` | Percorso di Claude Code, se il programma non lo trova da solo: l'eseguibile, oppure (installazione npm) il `cli.js` di Claude Code nella cartella `node_modules` globale | cercato da solo |
 | `CODEX_BIN` | Percorso di Codex, se il programma non lo trova da solo: l'eseguibile, oppure (installazione npm) il `codex.js` di Codex nella cartella `node_modules` globale | cercato da solo |
@@ -351,11 +354,22 @@ Altre cose che puoi fare in chat:
 
 In chat la ricerca web è spenta.
 
+**Allegati.** Con la graffetta, trascinando un file sul campo di scrittura o incollandolo, dai agli agenti un'immagine (PNG, JPEG, WebP), un PDF o un file di testo. Toccando la scheda di un allegato scrivi una descrizione per gli agenti, utile soprattutto per le immagini.
+
+- Immagini e PDF si riconoscono dal contenuto, non dall'estensione. Un file di testo deve essere UTF-8 e avere un'estensione ammessa (md, txt, csv, json, html, css, js, ts, py, yaml, sql). Gli SVG non sono accettati: esportali in PNG.
+- Le foto perdono la posizione GPS e gli altri metadati prima di essere salvate; nei testi i valori che sembrano credenziali si sostituiscono con un segnaposto.
+- Limiti: 8 MB per immagine, 10 MB per PDF, 1 MB per testo; per chat al massimo 20 file e 40 MB.
+- In chat e in riunione gli agenti leggono i testi e le descrizioni, come dati e non come istruzioni; le immagini e i PDF lì non li vedono. Una partita avviata dalla chat ne prende una copia: in produzione i file stanno nella cartella `allegati/` del cantiere, dove chi costruisce li può aprire e usare.
+
 ### Scheda compito
 
 Quando dalla chat viene fuori una cosa da fare, l'agente propone una **scheda compito**: titolo, obiettivo, ed eventualmente una cartella autorizzata da usare. Premi **Avvia** e parte una partita. Una scheda avvia una partita sola, anche se premi due volte.
 
 Se la scheda dice **"piano, poi produzione"** e la partita finisce con l'accordo pieno, la produzione parte da sola. Senza accordo pieno la produzione non parte da sola: decidi tu.
+
+Dopo l'avvio la scheda diventa la **carta del lavoro**: le tappe (riunione, sintesi, produzione, collaudo, consegna), chi lavora adesso con le ultime azioni, un campo per scrivere una nota alla squadra e, a lavoro finito, l'esito del collaudo, l'anteprima, **Apri la cartella** e **Chiedi una modifica**. Il tasto del lavoro (**Guarda il lavoro** mentre si lavora, **Apri il lavoro** alla fine) mostra il foglio con tutto: sul computer i file a sinistra e a destra la conclusione, cosa resta da sistemare, la squadra e la riunione.
+
+A lavoro finito chi apre la chat scrive da solo un **riepilogo**: cosa è pronto, dove sono i file, cosa resta e cosa conviene fare. Ogni riepilogo è una chiamata in più: uno a fine riunione, se la produzione non parte da sola, e uno a fine produzione. Con **Ferma** si ferma anche il riepilogo.
 
 ### Partite: la riunione
 
@@ -405,11 +419,13 @@ Nella sintesi i capi scelgono anche la **procedura** e dividono il lavoro per la
 La produzione trasforma la decisione di una partita in file, come una catena di montaggio.
 
 1. Il programma crea il **cantiere**: una cartella nuova in `dati/cantieri/<id>`, vuota o con la copia ripulita di una cartella autorizzata.
-2. Gli assistenti di produzione costruiscono i **pacchetti** decisi nella sintesi, uno dopo l'altro, nello stesso cantiere: ognuno vede i file dei precedenti. Lavorano tutti con Claude. Senza pacchetti si seguono i passi di produzione della procedura; senza neanche quelli, costruisce tutto Paolo (sviluppo). Non possono eseguire comandi, non usano il web e non possono uscire dalla cartella.
-3. Codex fa il **collaudo**: legge i file e dice se il lavoro regge. Se la procedura ha passi di collaudo, dopo Codex i loro assistenti rivedono i file, in sola lettura. Il collaudo passa solo se lo approvano tutti quelli che hanno risposto.
+2. Gli assistenti di produzione costruiscono i **pacchetti** decisi nella sintesi, nello stesso cantiere. Quelli indipendenti partono insieme (al massimo 3, si cambia con `AMBO_INSIEME`), gli altri appena sono pronti i pacchetti da cui dipendono: ognuno vede i file di chi ha già finito. Lavorano tutti con Claude. Senza pacchetti si seguono i passi di produzione della procedura; senza neanche quelli, costruisce tutto Paolo (sviluppo). Non possono eseguire comandi, non usano il web e non possono uscire dalla cartella.
+3. Codex fa il **collaudo**: legge i file e dice se il lavoro regge. Se la procedura ha passi di collaudo, i loro assistenti rivedono i file insieme a Codex, in sola lettura. Il collaudo passa solo se lo approvano tutti quelli che hanno risposto.
 4. Se il collaudo respinge il lavoro, corregge l'assistente dei file citati nei problemi e si ricontrolla, al massimo due volte.
 
-I file restano nel cantiere: li copi tu dove servono. Il programma non tocca mai la cartella originale.
+I file restano nel cantiere: li copi tu dove servono, con **Apri la cartella** dalla carta del lavoro. Il programma non tocca mai la cartella originale.
+
+Mentre la produzione lavora puoi scrivere una nota alla squadra: la leggono il prossimo pacchetto o la prossima correzione e il collaudo di Codex, se non è già cominciato.
 
 Una partita conclusa si può mandare in produzione anche a mano, dalla sua pagina.
 
@@ -440,7 +456,9 @@ L'ufficio è diviso in reparti, ognuno con il suo cartello a terra:
 - Nel magazzino la catena di montaggio ha cinque stazioni: **Piano** (la sintesi approvata), **Costruzione** (una postazione per pacchetto, con chi lo costruisce), **Collaudo** (Codex e gli assistenti di collaudo della procedura), **Correzioni** (solo se servono) e **Consegna**. La scatola del lavoro sta alla stazione dove la produzione è davvero.
 - Con la grafica ridotta (di serie sul telefono, o quando il PC rallenta) si animano al massimo 4 assistenti: prima chi lavora.
 
-In chat i **Lavori** stanno in una riga sola, per esempio "2 da decidere · 1 al lavoro": un tocco apre l'elenco di cosa è al lavoro adesso e di cosa aspetta una tua decisione.
+In cima alla chat c'è la **squadra in campo**: Claude, Codex e gli assistenti che lavorano adesso ai lavori della chat, con due parole su cosa fanno. Un tocco apre l'elenco dei lavori (prima quelli che aspettano una tua decisione, poi quelli al lavoro) e il diario.
+
+**Plancia.** Sul computer (da 1024 px di larghezza) accanto alla chat c'è la plancia: una scheda per lavoro con la copertina (la pagina o il documento prodotto), lo stato e le tappe: prima i lavori di questa chat, poi gli ultimi altri lavori al lavoro o con una produzione (al massimo 8). L'ufficio 3D sta in un riquadro in alto a destra; con il tasto per ingrandirlo torna a fare da sfondo, e con "Torna alla plancia" torna nel riquadro.
 
 ### Voce
 
@@ -515,11 +533,12 @@ I token si vedono cliccando una risposta (o sempre, con «Mostra tempi e token»
 
 - Il server ascolta solo su 127.0.0.1 e controlla le intestazioni Host e Origin, contro DNS rebinding e CSRF.
 - In chat e in partita gli agenti non hanno strumenti che scrivono file o eseguono comandi. Se una CLI prova a usare uno strumento non ammesso, il motore ferma il turno.
-- Gli assistenti della squadra li lancia il motore, uno alla volta, con gli stessi strumenti e controlli dei capi reparto. Anche i tuoi agenti di Claude Code danno solo istruzioni: gli strumenti li decide il motore. Incarichi, pacchetti e revisioni hanno un numero massimo.
+- Gli assistenti della squadra li lancia il motore (in riunione uno alla volta, in produzione anche più insieme), con gli stessi strumenti e controlli dei capi reparto. Anche i tuoi agenti di Claude Code danno solo istruzioni: gli strumenti li decide il motore. Incarichi, pacchetti e revisioni hanno un numero massimo.
 - La ricerca web è spenta di serie e si accende solo per la singola partita. È l'unico accesso alla rete che gli agenti hanno, oltre al loro servizio.
 - Il motore toglie le chiavi API dall'ambiente delle CLI. Di serie si ferma se una CLI usa una chiave API; si ferma sempre se Claude passa ai crediti extra.
 - In produzione gli assistenti scrivono solo nel cantiere: lo impongono le regole dei permessi di Claude Code e il motore ferma il lavoro se vede una scrittura fuori.
-- Note e cartelle sono trattate come dati, non come istruzioni.
+- Note, cartelle e allegati sono trattati come dati, non come istruzioni. Gli allegati si riconoscono dal contenuto, gli SVG si rifiutano e le foto perdono i metadati.
+- Le anteprime delle pagine prodotte stanno in una cornice senza permessi e con una CSP sua: niente script, niente moduli, niente richieste, né verso la rete né verso il programma.
 
 Non è una sandbox del sistema operativo: si appoggia ai sistemi di permessi delle CLI. Dettagli in [SECURITY.md](SECURITY.md).
 
@@ -530,6 +549,8 @@ Non è una sandbox del sistema operativo: si appoggia ai sistemi di permessi del
 - Gli assistenti non sono sub-agenti delle CLI: li lancia il motore uno alla volta, quindi una riunione con molti incarichi dura di più.
 - Le risposte degli agenti possono essere sbagliate, anche quando sono d'accordo tra loro e anche dopo il collaudo.
 - La produzione non esegue comandi: non installa dipendenze, non compila, non lancia test. Il collaudo è una lettura dei file.
+- Un file sopra i 20 000 caratteri non ha anteprima, e nemmeno quelli che vengono dopo i primi 150 000 caratteri del lavoro: si aprono dalla cartella del cantiere.
+- Le anteprime delle pagine non eseguono script: una pagina che si costruisce con JavaScript si vede incompleta.
 - Il programma dipende dalle opzioni e dal formato di uscita delle CLI. Un aggiornamento di Claude Code o di Codex può cambiare qualcosa: in quel caso il programma di solito si ferma con un errore invece di andare avanti senza controlli.
 - Per Codex il programma controlla (di serie) che il login sia con ChatGPT e non con chiave API. Se il tuo piano ChatGPT usa crediti aggiuntivi quando finisci i limiti, il programma non lo vede: controllalo nelle impostazioni del tuo account.
 - È pensato per una persona sola, sul suo PC. Non è fatto per essere messo in rete o usato da più persone.

@@ -146,7 +146,7 @@ export function Produzione({ dibattito: d, cartelle, soloLettura }: { dibattito:
       {attesa && <p className="mt-1 text-[13px] text-grafite">Avvio della produzione…</p>}
       {!p && !conferma && !attesa && (
         <>
-          <p className="mt-1 text-[13px] text-grafite">La decisione passa al magazzino: {previsti.length > 1 ? `${quanti(previsti.length, 'pacchetto', 'pacchetti')}, uno dopo l'altro, costruiti da ${costruttori}` : `la costruisce ${costruttori}`} in una cartella tutta della squadra, poi Codex fa il collaudo{revisori.length ? ` e ${revisori.join(', ')} rivede i file` : ''}. Se il collaudo la respinge si corregge e si ricontrolla, al massimo due volte.</p>
+          <p className="mt-1 text-[13px] text-grafite">La decisione passa al magazzino: {previsti.length > 1 ? `${quanti(previsti.length, 'pacchetto', 'pacchetti')} (quelli indipendenti insieme), costruiti da ${costruttori}` : `la costruisce ${costruttori}`} in una cartella tutta della squadra, poi Codex fa il collaudo{revisori.length ? ` e intanto ${revisori.join(', ')} rivede i file` : ''}. Se il collaudo la respinge si corregge e si ricontrolla, al massimo due volte.</p>
           {previsti.length > 1 && (
             <ol className="mt-1.5 list-decimal space-y-0.5 pl-5 text-[13px]">
               {previsti.map((x, n) => <li key={n}><span className="font-semibold">{x.titolo}</span> · {chiE(squadra, x.assistente).nome}</li>)}
@@ -162,7 +162,7 @@ export function Produzione({ dibattito: d, cartelle, soloLettura }: { dibattito:
           <ul className="mt-1 list-disc space-y-0.5 pl-5">
             <li>{costruttori || 'Paolo (Sviluppo)'}, con Claude, {previsti.length > 1 ? 'scrivono' : 'scrive'} file solo in una cartella nuova (il cantiere), dentro i dati del programma sul PC.</li>
             <li>Niente comandi, niente installazioni, niente internet. Al massimo 40 passaggi e 25 minuti per pacchetto.</li>
-            <li>Codex legge quello che è stato scritto e dà il collaudo{revisori.length ? `, poi ${revisori.join(', ')} rivede i file in sola lettura` : ''}; se lo respinge, si corregge e si ricontrolla (al massimo due correzioni). Tutti {d.config.memoria ? 'consultano le tue note in sola lettura' : 'lavorano senza le tue note'}.</li>
+            <li>Codex legge quello che è stato scritto e dà il collaudo{revisori.length ? ` e intanto ${revisori.join(', ')} rivede i file in sola lettura` : ''}; se lo respinge, si corregge e si ricontrolla (al massimo due correzioni). Tutti {d.config.memoria ? 'consultano le tue note in sola lettura' : 'lavorano senza le tue note'}.</li>
             <li>Consuma quota degli abbonamenti, come un dibattito un po' lungo.</li>
           </ul>
           <label className="mt-2 flex flex-col gap-1">

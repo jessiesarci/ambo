@@ -22,7 +22,8 @@ const SintesiZ = z.object({
   decisioni: lista,
   disaccordi: z.array(z.object({ punto: z.string(), posizione_claude: z.string(), posizione_codex: z.string() })),
   prossimi_passi: lista,
-  pacchetti: z.array(z.object({ titolo: z.string(), assistente: z.string(), obiettivo: z.string() })).default(() => []),
+  // dipende manca nelle sintesi scritte prima della produzione in parallelo: allora si va in fila.
+  pacchetti: z.array(z.object({ titolo: z.string(), assistente: z.string(), obiettivo: z.string(), dipende: z.array(z.number()).optional() })).default(() => []),
   procedura: z.string().default('su-misura'),
 });
 const VerificaZ = z.object({

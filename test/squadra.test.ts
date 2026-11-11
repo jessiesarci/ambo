@@ -10,7 +10,7 @@ import { inMarkdown } from '../motore/markdown.ts';
 import { Annullato, ErroreAgente } from '../motore/processo.ts';
 import type { Operai } from '../motore/produzione.ts';
 import { incarichiDi } from '../motore/prompt.ts';
-import { catalogoAssistenti, leggiFrontmatterAgente, leggiStatistiche, livello, procedure, senzaEsempi, squadraConStatistiche, titolo } from '../motore/squadra.ts';
+import { catalogoAssistenti, leggiFrontmatterAgente, leggiStatistiche, livello, normalizzaPacchetti, procedure, senzaEsempi, squadraConStatistiche, titolo } from '../motore/squadra.ts';
 import type { Agente, Corrente, Evento, Incarico } from '../motore/tipi.ts';
 
 type Op = Parameters<ChiamaAgente>[0];
@@ -438,4 +438,170 @@ test('procedura con passo di collaudo: dopo Codex rivede l\'assistente, e i suoi
   assert.match(md, /Revisioni della procedura:\*\*[\s\S]*Giro 1 · Nadia: respinto/);
   assert.match(md, /\| revisione · Nadia \| Codex/);
   assert.match(md, /\| correzione · Paolo \| Claude/);
+});
+
+
+// Un costruttore finto che dura un attimo e conta quanti lavorano nello stesso momento.
+function costruttoreFinto(file: (prompt: string) => string, esito?: (prompt: string, op: Parameters<Operai['costruisci']>[0]) => Promise<void>) {
+  const partiti: string[] = [];
+  const finiti: string[] = [];
+  const prompt: string[] = [];
+  let ora = 0;
+  let massimo = 0;
+  const costruisci: Operai['costruisci'] = async (op) => {
+    const nome = file(op.prompt);
+    partiti.push(nome);
+    prompt.push(op.prompt);
+    massimo = Math.max(massimo, ++ora);
+    try {
+      if (esito) await esito(op.prompt, op);
+      else await new Promise((ok) => setTimeout(ok, 40));
+      writeFileSync(join(op.cantiere, nome), `contenuto di ${nome}\n`);
+      op.suScrittura?.(nome);
+      finiti.push(nome);
+      return { ...esitoFinto(`Scritto ${nome}`), scritti: [nome], negati: 0, finitiTurni: false };
+    } finally {
+      ora--;
+    }
+  };
+  return { costruisci, partiti, finiti, prompt, massimo: () => massimo };
+}
+const collaudoOk: Operai['collauda'] = async () => esitoFinto(JSON.stringify({ approvato: true, problemi: [], commento: 'regge' }));
+// Il titolo del pacchetto di questo prompt, dalla riga "IL TUO PACCHETTO".
+const mioPacchetto = (prompt: string) => /IL TUO PACCHETTO \(\d+ di \d+\): «([^»]+)»/.exec(prompt)?.[1] ?? '';
+
+test('produzione in parallelo: i pacchetti indipendenti partono insieme, quello che dipende da tutti dopo', async () => {
+  const pacchetti = [
+    { titolo: 'Testi', assistente: 'testi', obiettivo: 'Scrivi testi.md', dipende: [] },
+    { titolo: 'Pagina', assistente: 'sviluppo', obiettivo: 'Scrivi index.html', dipende: [] },
+    { titolo: 'Unione', assistente: 'testi', obiettivo: 'Rivedi tutto e scrivi LEGGIMI.md', dipende: [1, 2] },
+  ];
+  const f = finto({ claude: [claude('proposta'), claude('accordo'), sintesi({ pacchetti })], codex: [codex('accordo'), verifica] });
+  const file: Record<string, string> = { Testi: 'testi.md', Pagina: 'index.html', Unione: 'LEGGIMI.md' };
+  const c = costruttoreFinto((p) => file[mioPacchetto(p)]!);
+  const { m } = motore(f.chiamaAgente, { operai: { costruisci: c.costruisci, collauda: collaudoOk } });
+  const d0 = await m.avvia(m.crea(base()).id);
+  assert.deepEqual(d0.sintesi!.testo.pacchetti!.map((x) => x.dipende), [[], [], [1, 2]]);
+  const d = await m.produci(d0.id, null);
+  const p = d.produzione!;
+  assert.equal(p.stato, 'pronta');
+  assert.equal(c.massimo(), 2, 'i due indipendenti lavorano nello stesso momento, il terzo no');
+  assert.deepEqual(c.partiti.slice(0, 2).sort(), ['index.html', 'testi.md']);
+  assert.equal(c.partiti[2], 'LEGGIMI.md');
+  assert.ok(c.finiti.indexOf('LEGGIMI.md') > c.finiti.indexOf('testi.md') && c.finiti.indexOf('LEGGIMI.md') > c.finiti.indexOf('index.html'));
+  const [pTesti, pPagina, pUnione] = c.prompt;
+  assert.match(pTesti!, /Lavorano insieme a te, nello stesso cantiere e nello stesso momento:\n2\. «Pagina» · Paolo/);
+  assert.match(pTesti!, /Dopo di te verranno:\n3\. «Unione» · Luca/);
+  assert.match(pPagina!, /Lavorano insieme a te, nello stesso cantiere e nello stesso momento:\n1\. «Testi» · Luca/);
+  assert.match(pPagina!, /Scrivi solo i file della tua parte/);
+  assert.match(pUnione!, /Prima di te hanno lavorato:\n1\. «Testi» · Luca: file testi\.md[\s\S]*\n2\. «Pagina» · Paolo: file index\.html/);
+  assert.match(pUnione!, /Sei l'ultimo pacchetto: chiudi il lavoro e aggiorna il LEGGIMI\.md/);
+  assert.deepEqual(p.pacchetti!.map((x) => x.stato), ['fatto', 'fatto', 'fatto']);
+  assert.doesNotMatch(p.resoconto!, /Da controllare/);
+});
+
+test('dipendenze della sintesi: rinumerate quando un pacchetto è scartato, mai verso pacchetti dopo', () => {
+  const cat = catalogoAssistenti(null);
+  const { pacchetti, note } = normalizzaPacchetti([
+    { titolo: 'Ricerca', assistente: 'ricerca', obiettivo: 'non si costruisce', dipende: [] },
+    { titolo: 'Testi', assistente: 'testi', obiettivo: 'testi.md', dipende: [] },
+    { titolo: 'Pagina', assistente: 'sviluppo', obiettivo: 'index.html', dipende: [2, 4, 1, 3] },
+    { titolo: 'Vecchio', assistente: 'testi', obiettivo: 'senza dipendenze dichiarate' },
+  ], cat);
+  assert.deepEqual(pacchetti.map((x) => x.titolo), ['Testi', 'Pagina', 'Vecchio']);
+  assert.deepEqual(pacchetti.map((x) => x.dipende), [[], [1], undefined], 'il 2 diventa 1; il 4 è dopo, il 1 è scartato, il 3 è se stesso');
+  assert.ok(note.some((x) => /«Pagina»: tolte le dipendenze/.test(x)));
+});
+
+test('produzione in parallelo: un pacchetto che non riesce ferma quelli che lavorano insieme, senza contarli come falliti', async () => {
+  const pacchetti = [
+    { titolo: 'Testi', assistente: 'testi', obiettivo: 'Scrivi testi.md', dipende: [] },
+    { titolo: 'Pagina', assistente: 'sviluppo', obiettivo: 'Scrivi index.html', dipende: [] },
+  ];
+  const f = finto({ claude: [claude('proposta'), claude('accordo'), sintesi({ pacchetti })], codex: [codex('accordo'), verifica] });
+  const c = costruttoreFinto((p) => (mioPacchetto(p) === 'Testi' ? 'testi.md' : 'index.html'), async (prompt, op) => {
+    if (mioPacchetto(prompt) === 'Testi') {
+      await new Promise((ok) => setTimeout(ok, 20));
+      throw new Error('la CLI si è chiusa');
+    }
+    await new Promise((_, rifiuta) => op.signal!.addEventListener('abort', () => rifiuta(new Annullato()), { once: true }));
+  });
+  const { m, dati } = motore(f.chiamaAgente, { operai: { costruisci: c.costruisci, collauda: collaudoOk } });
+  const d0 = await m.avvia(m.crea(base()).id);
+  const d = await m.produci(d0.id, null);
+  const p = d.produzione!;
+  assert.equal(p.stato, 'errore');
+  assert.match(p.errore!, /la CLI si è chiusa/);
+  assert.deepEqual(p.pacchetti!.map((x) => [x.stato, x.errore]), [['fallito', 'la CLI si è chiusa'], ['fallito', 'fermato: un altro pacchetto non è riuscito']]);
+  const s = leggiStatistiche(dati);
+  assert.equal(s.testi?.falliti, 1);
+  assert.equal(s.sviluppo?.falliti ?? 0, 0, 'fermato per colpa di un altro: non è un suo fallimento');
+});
+
+test('produzione in parallelo: due pacchetti insieme sullo stesso file finiscono "da controllare"', async () => {
+  const pacchetti = [
+    { titolo: 'Testi', assistente: 'testi', obiettivo: 'Scrivi testi.md', dipende: [] },
+    { titolo: 'Pagina', assistente: 'sviluppo', obiettivo: 'Scrivi index.html', dipende: [] },
+  ];
+  const f = finto({ claude: [claude('proposta'), claude('accordo'), sintesi({ pacchetti })], codex: [codex('accordo'), verifica] });
+  const c = costruttoreFinto(() => 'comune.md');
+  const { m } = motore(f.chiamaAgente, { operai: { costruisci: c.costruisci, collauda: collaudoOk } });
+  const d0 = await m.avvia(m.crea(base()).id);
+  const d = await m.produci(d0.id, null);
+  assert.equal(d.produzione!.stato, 'pronta');
+  assert.match(d.produzione!.resoconto!, /### Da controllare\n\n- «Testi» e «Pagina» hanno scritto tutti e due comune\.md mentre lavoravano insieme/);
+});
+
+test('nota durante la produzione: la legge il pacchetto che parte dopo, e il collaudo', async () => {
+  const pacchetti = [
+    { titolo: 'Testi', assistente: 'testi', obiettivo: 'Scrivi testi.md' },
+    { titolo: 'Pagina', assistente: 'sviluppo', obiettivo: 'Scrivi index.html' },
+  ];
+  const f = finto({ claude: [claude('proposta'), claude('accordo'), sintesi({ pacchetti })], codex: [codex('accordo'), verifica] });
+  let m!: Motore;
+  let id = '';
+  const prompt: string[] = [];
+  let collaudo = '';
+  const operai: Operai = {
+    costruisci: async (op) => {
+      prompt.push(op.prompt);
+      if (prompt.length === 1) assert.equal(m.intervieni(id, 'Usa il blu del sito'), true, 'a riunione finita la nota passa, la produzione lavora');
+      const file = prompt.length === 1 ? 'testi.md' : 'index.html';
+      writeFileSync(join(op.cantiere, file), 'x\n');
+      op.suScrittura?.(file);
+      return { ...esitoFinto(`Scritto ${file}`), scritti: [file], negati: 0, finitiTurni: false };
+    },
+    collauda: async (op) => {
+      collaudo = op.prompt;
+      return esitoFinto(JSON.stringify({ approvato: true, problemi: [], commento: 'regge' }));
+    },
+  };
+  ({ m } = motore(f.chiamaAgente, { operai }));
+  const d0 = await m.avvia(m.crea(base()).id);
+  id = d0.id;
+  assert.equal(m.intervieni(id, 'troppo presto'), false, 'riunione conclusa e niente produzione: la nota non arriverebbe a nessuno');
+  await m.produci(id, null);
+  assert.doesNotMatch(prompt[0]!, /NOTE DELL'UTENTE ARRIVATE DURANTE LA PRODUZIONE/);
+  assert.match(prompt[1]!, /NOTE DELL'UTENTE ARRIVATE DURANTE LA PRODUZIONE, hanno la precedenza[^\n]*\n- Usa il blu del sito/);
+  assert.match(collaudo, /- Usa il blu del sito/);
+  assert.doesNotMatch(prompt[1]!, /troppo presto/);
+  assert.equal(m.intervieni(id, 'dopo la consegna'), false, 'a produzione finita la nota non arriva più a nessuno');
+});
+
+test('produzione in parallelo: il LEGGIMI lo aggiorna uno solo, anche se l\'ultimo a partire lavora insieme a uno partito prima', async () => {
+  const pacchetti = [
+    { titolo: 'Testi', assistente: 'testi', obiettivo: 'Scrivi testi.md', dipende: [] },
+    { titolo: 'Pagina', assistente: 'sviluppo', obiettivo: 'Scrivi index.html', dipende: [1] },
+    { titolo: 'Stile', assistente: 'design', obiettivo: 'Scrivi stile.css', dipende: [] },
+  ];
+  const nomi: Record<string, string> = { Testi: 'testi.md', Pagina: 'index.html', Stile: 'stile.css' };
+  const f = finto({ claude: [claude('proposta'), claude('accordo'), sintesi({ pacchetti })], codex: [codex('accordo'), verifica] });
+  // Lo stile dura di più: quando parte la pagina, lavora ancora.
+  const c = costruttoreFinto((p) => nomi[mioPacchetto(p)]!, (p) => new Promise((ok) => setTimeout(ok, mioPacchetto(p) === 'Stile' ? 150 : 20)));
+  const { m } = motore(f.chiamaAgente, { operai: { costruisci: c.costruisci, collauda: collaudoOk } });
+  const d0 = await m.avvia(m.crea(base()).id);
+  assert.equal((await m.produci(d0.id, null)).produzione!.stato, 'pronta');
+  const chiude = c.prompt.filter((x) => /Sei l'ultimo pacchetto: chiudi il lavoro e aggiorna il LEGGIMI\.md/.test(x));
+  assert.deepEqual(chiude.map(mioPacchetto), ['Pagina']);
+  assert.match(c.prompt.find((x) => mioPacchetto(x) === 'Stile')!, /Non toccare il LEGGIMI\.md: lo aggiorna l'ultimo pacchetto/);
 });

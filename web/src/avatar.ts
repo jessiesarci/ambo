@@ -71,8 +71,9 @@ function tintaDa(id: string): string {
 export function tratti(id: string): Tratti {
   const s = STANDARD[id];
   if (s) return s;
+  // Claude e Codex: la testa viene dall'id, la tinta è quella della sala (lime e grigio).
   return {
-    tinta: tintaDa(id),
+    tinta: CAPI[id] ?? tintaDa(id),
     testa: pesca(TESTE, id, 'testa'),
     occhi: pesca(OCCHI, id, 'occhi'),
     bocca: pesca(BOCCHE, id, 'bocca'),

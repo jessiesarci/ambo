@@ -47,7 +47,7 @@
     },
     "pacchetti": {
       "type": "array",
-      "description": "I pacchetti di lavoro per la produzione, nell'ordine in cui vanno costruiti; vuoto se non c'è niente da costruire",
+      "description": "I pacchetti di lavoro per la produzione, numerati da 1 nell'ordine dato; vuoto se non c'è niente da costruire",
       "items": {
         "type": "object",
         "properties": {
@@ -61,12 +61,20 @@
           "obiettivo": {
             "type": "string",
             "description": "Cosa deve consegnare, comprensibile senza leggere la riunione"
+          },
+          "dipende": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "I numeri dei pacchetti che devono essere finiti prima di questo (solo numeri più piccoli). Vuoto se si può costruire senza i file degli altri: allora parte subito, insieme agli altri indipendenti"
           }
         },
         "required": [
           "titolo",
           "assistente",
-          "obiettivo"
+          "obiettivo",
+          "dipende"
         ],
         "additionalProperties": false
       }

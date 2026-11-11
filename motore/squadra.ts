@@ -1,6 +1,6 @@
 // La squadra: gli assistenti che i due capi reparto chiamano durante la riunione e che in produzione
 // costruiscono i pacchetti di lavoro. Non sono sub-agenti delle CLI (Agent e Task restano vietati):
-// li lancia il motore, uno alla volta, ognuno con un processo suo e gli stessi controlli dei capi
+// li lancia il motore (in riunione uno alla volta, in produzione anche più insieme), ognuno con un processo suo e gli stessi controlli dei capi
 // reparto. Qui stanno il catalogo (7 assistenti standard più, con l'ambiente acceso, gli agenti
 // dell'utente), le procedure, le istruzioni e quanto hanno lavorato (XP e livelli).
 import { createHash } from 'node:crypto';
@@ -522,7 +522,9 @@ export function normalizzaPacchetti(lista: PacchettoPiano[], c: readonly VoceCat
   const pacchetti: PacchettoPiano[] = [];
   const note: string[] = [];
   const chi = c.filter((a) => a.produzione).map((a) => a.id).join(', ');
-  for (const p of lista) {
+  // Il numero (da 1) di ogni pacchetto tenuto, nella lista scritta dalla sintesi e in quella pulita.
+  const nuovo = new Map<number, number>();
+  for (const [k, p] of lista.entries()) {
     const titolo = p.titolo.replace(/\s+/g, ' ').trim().slice(0, 120);
     const obiettivo = taglia(p.obiettivo.trim(), MAX_OBIETTIVO);
     const a = trovaAssistente(c, p.assistente);
@@ -538,7 +540,17 @@ export function normalizzaPacchetti(lista: PacchettoPiano[], c: readonly VoceCat
       note.push(`Pacchetto «${titolo}» scartato: al massimo ${MAX_PACCHETTI} pacchetti per produzione.`);
       continue;
     }
-    pacchetti.push({ titolo, assistente: a.id, obiettivo });
+    pacchetti.push({ titolo, assistente: a.id, obiettivo, ...(Array.isArray(p.dipende) ? { dipende: p.dipende } : {}) });
+    nuovo.set(k + 1, pacchetti.length);
+  }
+  // Le dipendenze passano ai numeri nuovi e solo verso pacchetti prima (niente cicli). Chi dipendeva
+  // da un pacchetto scartato non lo aspetta più, e lo si dice.
+  for (const [i, p] of pacchetti.entries()) {
+    if (!p.dipende) continue;
+    const prima = p.dipende.filter((n) => Number.isInteger(n));
+    const tenuti = [...new Set(prima.map((n) => nuovo.get(n)).filter((n): n is number => !!n && n <= i))].sort((x, y) => x - y);
+    if (tenuti.length < new Set(prima).size) note.push(`Pacchetto «${p.titolo}»: tolte le dipendenze da pacchetti scartati o non precedenti.`);
+    p.dipende = tenuti;
   }
   return { pacchetti, note };
 }

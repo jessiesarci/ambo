@@ -15,7 +15,7 @@ Il motore non parla con i modelli direttamente. Avvia le **CLI ufficiali come pr
 
 Ogni CLI usa il login che hai già fatto e manda le richieste al proprio servizio. Se accendi la ricerca web in una partita, le CLI usano anche la loro ricerca web: è l'unico altro accesso alla rete degli agenti. Il motore legge l'output delle CLI riga per riga, mostra cosa stanno facendo e ferma il processo se qualcosa non va.
 
-Anche gli assistenti della squadra sono processi delle stesse CLI: li avvia il motore, uno alla volta, ognuno con il suo messaggio di sistema. Non sono sub-agenti delle CLI (gli strumenti per crearli restano vietati).
+Anche gli assistenti della squadra sono processi delle stesse CLI: li avvia il motore (in riunione uno alla volta, in produzione anche più insieme), ognuno con il suo messaggio di sistema. Non sono sub-agenti delle CLI (gli strumenti per crearli restano vietati).
 
 ```
 browser (dashboard)
@@ -50,6 +50,18 @@ Comandi della chat:
 - **Salva come nota**: salva la chat come nota markdown nella sottocartella `Chat` di `AMBO_SALVA_IN`.
 - **Trasforma in compito**: apre una finestra da riempire a mano (titolo, obiettivo, "solo il piano" o "piano, poi produzione") e avvia la partita. Se un agente ha già proposto una scheda, parte da quella, ma la cartella della scheda non passa: per una partita con il materiale di una cartella usa **Avvia** sulla scheda.
 
+### Allegati
+
+Con la graffetta del campo, trascinando un file sul campo di scrittura o incollandolo, aggiungi un allegato: un'immagine (PNG, JPEG, WebP), un PDF o un file di testo (md, txt, csv, json, html, css, js, ts, py, yaml, sql). Le schede degli allegati stanno sopra il campo; toccandone una scrivi una descrizione per gli agenti (al massimo 1000 caratteri), utile soprattutto per le immagini.
+
+- **Immagini e PDF si riconoscono dai byte**, non dall'estensione né da quello che dice il browser. Un file di testo deve essere UTF-8 valido e avere una delle estensioni ammesse, che conserva. Gli SVG si rifiutano, anche con un altro nome: vanno esportati in PNG. Si rifiuta anche tutto quello che non è riconosciuto.
+- **Il nome lo decide il motore**: un nome pulito per gli agenti, mentre su disco il file porta un id.
+- **Le immagini perdono i metadati** prima di essere salvate: posizione GPS, dati del telefono o della fotocamera, data. Del PNG e del WebP restano solo i blocchi che servono a disegnare l'immagine (compreso il profilo colore); del JPEG si tolgono tutti i segmenti APP e i commenti, anche tra le scansioni di un JPEG progressivo, tranne JFIF, Adobe e il profilo colore, e dell'EXIF resta solo l'orientamento, per non girare le foto.
+- **Nei testi** i valori che sembrano chiavi, token o password si sostituiscono con un segnaposto, con lo stesso filtro delle cartelle autorizzate (un elenco di modelli: non li riconosce tutti).
+- **Limiti**: 8 MB per immagine (e al massimo 10 000 pixel per lato), 10 MB per PDF, 1 MB per testo; per chat al massimo 20 file e 40 MB.
+
+Gli agenti ricevono gli allegati come dati, mai come istruzioni: in chat l'elenco con le descrizioni e il testo dei file di testo (al massimo 12 000 caratteri in tutto, tra delimitatori casuali), e solo quando cambiano; in riunione lo stesso, fino a 20 000 caratteri. Le immagini e i PDF in chat e in riunione non si vedono: in produzione il file è nel cantiere e chi costruisce lo può aprire con lo strumento di lettura. Una partita avviata dalla chat prende una copia degli allegati: in riunione si leggono testi e descrizioni, in produzione i file stanno nella cartella `allegati/` del cantiere, dove chi costruisce li può aprire e richiamare (per esempio `<img src="allegati/logo.png">`), e il collaudo sa che ci sono. Togliere un allegato dalla chat non cambia le partite già avviate.
+
 ## Scheda compito
 
 Quando dalla chat viene fuori un lavoro da fare, l'agente chiude la risposta con un blocco `compito`: titolo, obiettivo, "solo il piano" oppure "piano, poi produzione", e una cartella autorizzata se serve. Il motore toglie il blocco dal testo e lo mostra come **scheda** con il tasto **Avvia**.
@@ -58,6 +70,26 @@ Quando dalla chat viene fuori un lavoro da fare, l'agente chiude la risposta con
 - Una scheda avvia **una partita sola**: se premi di nuovo, ritrovi quella già creata.
 - La chat riceve le notizie della partita: avviata, conclusa, produzione pronta o ferma.
 - Con **"piano, poi produzione"** e l'**accordo pieno**, la produzione parte da sola. Senza accordo pieno non parte: decidi tu.
+
+Dopo **Avvia** la scheda diventa la **carta del lavoro**, sempre nello stesso punto della chat:
+
+- il titolo, lo stato (per esempio "In corso", "Consegnato", "Da rivedere") e le **tappe**: riunione, sintesi, produzione, collaudo, consegna;
+- mentre si lavora: la fase, chi lavora, da quanto, le ultime tre azioni dal vivo e un campo per scrivere una nota alla squadra;
+- a lavoro finito: la conclusione in breve, il tempo, quanti assistenti, l'esito del collaudo, i ritocchi alla sintesi di chi l'ha verificata, l'anteprima della pagina prodotta (se c'è), la cartella del cantiere con **Apri la cartella** e, se il collaudo ha respinto, **Cosa resta**;
+- i tasti per aprire il foglio con tutto (**Guarda il lavoro** mentre si lavora, **Apri il lavoro** alla fine, **Dettagli** negli altri casi), **Chiedi una modifica** e, per una partita conclusa senza produzione, **Manda in produzione**.
+
+I messaggi del motore su un lavoro nato da una scheda (avviata, conclusa, produzione) non si ripetono in chat: stanno nella carta. In chat restano quelli d'errore, con il motivo.
+
+In cima alla chat c'è la **squadra in campo**: Claude, Codex e gli assistenti che lavorano adesso ai lavori di questa chat, con due parole su cosa fanno. Un tocco apre l'elenco dei lavori (prima quelli che aspettano una tua decisione, fermi nelle ultime 24 ore, poi quelli al lavoro) e il diario.
+
+**Riepilogo di fine lavoro.** Quando un lavoro nato dalla chat finisce (produzione pronta o ferma per un errore, oppure partita conclusa senza una produzione in arrivo), chi apre la chat scrive da solo il riepilogo: cosa è pronto o perché si è fermato, dove sono i file, cosa resta da controllare e cosa conviene fare adesso. Usa i dati veri del lavoro letti dal motore (file, collaudo, problemi, ritocchi). Ogni riepilogo è una chiamata in più: uno a fine riunione, se la produzione non parte da sola, e uno a fine produzione (anche quando la mandi in produzione dopo). Se la produzione l'hai fermata tu, il riepilogo non arriva; **Ferma** in chat ferma anche un riepilogo in corso.
+
+**Il foglio del lavoro** sul telefono sale sopra la chat; sul computer si apre accanto alla chat, su due colonne:
+
+- a sinistra **tutti i file prodotti**, uno per scheda: le pagine HTML come su un computer (1280 px) o su un telefono (390 px), i documenti markdown impaginati, il resto come testo. La pagina sta in una cornice senza permessi e con una CSP sua: niente script, niente moduli, niente richieste, né verso la rete né verso il programma. I fogli di stile e le immagini SVG prodotti nello stesso cantiere entrano nella pagina come testo, e le immagini allegate che la pagina richiama da `allegati/` come dati, così si vede completa. Un file sopra i 20 000 caratteri non ha anteprima, e nemmeno quelli che vengono dopo i primi 150 000 caratteri del lavoro: li trovi interi nella cartella del cantiere. Se nessun file ha l'anteprima, a sinistra c'è la riunione e i file sono elencati a destra;
+- a destra **In breve** (conclusione della sintesi, cosa resta per il collaudo, il resoconto di chi ha costruito), la squadra al lavoro, la riunione in battute, i numeri, gli allegati e dove sono i file.
+
+Sul telefono il foglio è una colonna sola, con i file in alto.
 
 ## Partita: la riunione
 
@@ -193,7 +225,7 @@ Una procedura è un modo di lavorare: un elenco di passi, ognuno con un assisten
 
 - `piano`: un incarico in riunione;
 - `produzione`: un pacchetto nel cantiere;
-- `collaudo`: una revisione in sola lettura dei file prodotti, dopo il collaudo di Codex.
+- `collaudo`: una revisione in sola lettura dei file prodotti, insieme al collaudo di Codex.
 
 Quelle di serie stanno in `motore/procedure/`: sito web, documento, analisi, codice e "su misura" (senza passi, decide la riunione). Quelle dell'utente stanno in `<cartella dati>/procedure/*.json`, fuori dal repository; con lo stesso id vincono su quelle di serie. I passi con un assistente che non è nel catalogo si tolgono, e una procedura che li perde tutti non si propone. Al massimo 20 procedure e 12 passi ciascuna.
 
@@ -230,20 +262,26 @@ I **badge** non si salvano: il motore li calcola dalle statistiche a ogni richie
 La produzione parte da una partita **conclusa con la sintesi**. Funziona come una catena di montaggio.
 
 1. **Cantiere.** Il motore crea una cartella nuova in `dati/cantieri/<id>`. È vuota, oppure contiene la copia ripulita di una cartella autorizzata (con lo stesso filtro del materiale). Se su Windows la cartella dei dati sta dentro `AppData`, la produzione si ferma subito con un messaggio: il motore vieta a Claude quella cartella, quindi lì non potrebbe scrivere.
-2. **Pacchetti.** I pacchetti sono quelli della sintesi, ricontrollati sul catalogo. Senza pacchetti si usano i passi di produzione della procedura scelta; senza neanche quelli c'è un solo pacchetto, "Tutta la decisione", per Paolo (sviluppo). Al massimo 5.
-3. **Lavoro degli assistenti.** I pacchetti si costruiscono **uno dopo l'altro**, nello stesso cantiere. Ogni assistente riceve la decisione (obiettivo, conclusione, decisioni, prossimi passi, punti aperti, procedura, pacchetti, esito della verifica), il suo pacchetto, chi ha lavorato prima di lui con i file che ha scritto e chi viene dopo. Il messaggio di sistema è quello del cantiere (`sistema-cantiere.md`) seguito dal suo ruolo.
+   Se la partita ha degli allegati, prima di cominciare il motore li copia nella cartella `allegati/` del cantiere. Nell'elenco dei file prodotti non contano, a meno che un pacchetto li riscriva; senza una cartella di partenza, però, il collaudo legge anche gli allegati di testo.
+2. **Pacchetti.** I pacchetti sono quelli della sintesi, ricontrollati sul catalogo. Senza pacchetti si usano i passi di produzione della procedura scelta; senza neanche quelli c'è un solo pacchetto, "Tutta la decisione", per Paolo (sviluppo). Al massimo 5. Ogni pacchetto della sintesi dice da quali pacchetti **dipende** (solo numeri più piccoli: il motore toglie gli altri e lo dice).
+3. **Lavoro degli assistenti.** I pacchetti **indipendenti partono insieme**, al massimo 3 nello stesso momento (`AMBO_INSIEME`, da 1 a 4); gli altri partono appena sono finiti quelli da cui dipendono. Tutti lavorano nello stesso cantiere e ognuno vede i file di chi ha già finito. Le sintesi scritte prima di questa versione (senza il campo `dipende`) e i passi delle procedure si costruiscono uno dopo l'altro. Più pacchetti insieme vuol dire anche più quota consumata nello stesso momento. Ogni assistente riceve la decisione (obiettivo, conclusione, decisioni, prossimi passi, punti aperti, procedura, pacchetti, esito della verifica), il suo pacchetto, chi ha già lavorato con i file che ha scritto, chi lavora insieme a lui e chi verrà dopo. Il LEGGIMI.md lo aggiorna uno solo: l'ultimo pacchetto a partire (il numero più alto, se partono insieme); agli altri il motore dice di non toccarlo. Il messaggio di sistema è quello del cantiere (`sistema-cantiere.md`) seguito dal suo ruolo.
    - Strumenti: solo lettura e scrittura di file, limitate alla cartella del cantiere dalle regole dei permessi di Claude Code.
    - Niente comandi, niente web, nessuna impostazione o server MCP dell'utente (a parte le note in sola lettura).
    - Le cartelle delle CLI (anche se spostate con `CLAUDE_CONFIG_DIR` o `CODEX_HOME`), quella delle chiavi SSH e `AppData` sono vietate in modo esplicito.
    - Il motore ferma il lavoro se vede una scrittura fuori dal cantiere, e controlla che Claude Code non abbia creato la sua memoria automatica per il cantiere.
    - Ogni pacchetto (e ogni correzione) ha un tempo massimo di 25 minuti e al massimo 40 passaggi.
-   - Se un pacchetto si ferma con un errore, la produzione si ferma: quello che è già scritto resta nel cantiere.
+   - Se un pacchetto si ferma con un errore, la produzione si ferma, anche per i pacchetti che lavoravano insieme a lui (risultano fermi, ma nelle statistiche della squadra non contano come falliti), e quelli in attesa non partono: quello che è già scritto resta nel cantiere.
+   - Se due pacchetti che lavorano insieme scrivono lo stesso file, il resoconto del primo giro lo segnala sotto "Da controllare" (dopo una correzione resta nei giri precedenti).
 4. **Collaudo di Codex.** Codex riceve il resoconto del cantiere e il testo dei file prodotti, in sola lettura. Risponde se approva, con l'elenco dei problemi e un commento.
-5. **Revisioni della procedura.** Se la procedura ha passi di collaudo, i loro assistenti rivedono gli stessi file dopo Codex, uno alla volta, in sola lettura, con la CLI del loro ruolo. Il collaudo del giro passa solo se lo approvano Codex e tutte le revisioni arrivate; i problemi delle revisioni entrano nell'elenco con il nome dell'assistente davanti. Una revisione che non arriva non blocca il collaudo, ma si dice.
+5. **Revisioni della procedura.** Se la procedura ha passi di collaudo, i loro assistenti rivedono gli stessi file nello stesso momento di Codex, in sola lettura, con la CLI del loro ruolo; le revisioni tornano nell'ordine della procedura. Il collaudo del giro passa solo se lo approvano Codex e tutte le revisioni arrivate; i problemi delle revisioni entrano nell'elenco con il nome dell'assistente davanti. Una revisione che non arriva non blocca il collaudo, ma si dice.
 6. **Correzione.** Se il collaudo respinge il lavoro, corregge l'assistente dei file citati più spesso nei problemi (a parità, quello dell'ultimo pacchetto fatto), nello stesso cantiere. Corregge quello che si risolve scrivendo file e dice cosa resta. Poi si ricontrolla. Si corregge **al massimo due volte**.
 7. **Consegna.** La produzione è pronta: con il collaudo superato, oppure "da rivedere" con l'ultimo collaudo. I file restano nel cantiere.
 
 La cartella originale non viene mai toccata. Se fermi la produzione o c'è un errore, quello che è già stato scritto resta nel cantiere.
+
+**Nota durante la produzione.** Mentre la produzione lavora puoi scrivere una nota alla squadra (dalla carta o dal foglio del lavoro). La leggono il prossimo pacchetto o la prossima correzione e il collaudo di Codex, se non è già cominciato (le revisioni della procedura no); ha la precedenza sull'obiettivo, ma non sulle regole del cantiere. Durante il collaudo la leggono solo le correzioni, se il collaudo respinge il lavoro, e il programma lo dice. Durante la sintesi e a produzione finita il campo non c'è.
+
+**Apri la cartella.** Dalla carta o dal foglio del lavoro il programma apre la cartella del cantiere in Esplora risorse (o nel Finder, o nel gestore dei file su Linux). Apre solo cartelle dentro `dati/cantieri`.
 
 ## Ufficio 3D e Lavori
 
@@ -270,7 +308,7 @@ Toccando un omino o il suo cartellino si apre la **scheda dell'agente**:
 - le skill in uso, solo se la CLI conferma di averle usate;
 - le skill a disposizione su questo PC.
 
-In chat i **Lavori** stanno in una riga sola ("2 da decidere · 1 al lavoro"). Un tocco apre l'elenco: prima quello che aspetta una tua decisione (fermo nelle ultime 24 ore), poi le partite e le produzioni al lavoro.
+**Plancia.** Sul computer (da 1024 px di larghezza) accanto alla chat c'è la plancia: una scheda per lavoro, con la copertina (la pagina o il documento prodotto, oppure a che punto è), lo stato e le tappe. In alto i lavori di questa chat (nati da una scheda o da **Trasforma in compito**), sotto gli ultimi altri lavori al lavoro o con una produzione, al massimo 8. Un tocco su una scheda apre il foglio del lavoro. L'ufficio 3D sta in un riquadro in alto a destra, con le inquadrature e un tasto per ingrandirlo: grande torna a fare da sfondo, e "Torna alla plancia" lo rimette nel riquadro. La scelta resta in questo browser. Sotto il riquadro, "Adesso in ufficio" elenca i lavori in corso e quello che fanno Claude e Codex. Tra 768 e 1023 px e sul telefono la plancia non c'è.
 
 ## Note e profilo
 
@@ -311,13 +349,14 @@ Tutto sta in `dati/` nella cartella del programma (o in `AMBO_DATI`):
 - le statistiche della squadra (`squadra.json`) e, se le scrivi, le tue procedure (`procedure/`);
 - i documenti finali delle partite in markdown;
 - i cantieri della produzione (`dati/cantieri/<id>`);
+- gli allegati delle chat (`dati/allegati/<id>`), con la copia per ogni partita avviata;
 - le note salvate (`dati/note`, se non scegli un'altra cartella con `AMBO_SALVA_IN`), con le sottocartelle `Decisioni` e `Chat`;
 - l'elenco delle cartelle autorizzate;
 - l'ambiente Python della voce (`dati/voce-venv`), se lo installi.
 
 Su Windows la cartella dei dati non deve stare dentro `AppData` (e il programma neanche): il motore vieta a Claude quella cartella, come quelle delle CLI e delle chiavi SSH, quindi ferma la produzione con un messaggio. Un percorso relativo in `AMBO_DATI` parte dalla cartella del programma.
 
-Niente esce dal PC, salvo quello che le CLI mandano ai rispettivi servizi per rispondere. Questo include i messaggi, il contesto della chat e quello che gli agenti leggono: profilo, note, copie delle cartelle autorizzate, file del cantiere. Con la ricerca web accesa, anche le ricerche che fanno gli agenti. Con la dettatura del browser, l'audio passa dai servizi del browser.
+Niente esce dal PC, salvo quello che le CLI mandano ai rispettivi servizi per rispondere. Questo include i messaggi, il contesto della chat e quello che gli agenti leggono: profilo, note, copie delle cartelle autorizzate, allegati, file del cantiere. Con la ricerca web accesa, anche le ricerche che fanno gli agenti. Con la dettatura del browser, l'audio passa dai servizi del browser.
 
 Le CLI tengono anche la loro cronologia delle sessioni nelle proprie cartelle, come fanno sempre.
 

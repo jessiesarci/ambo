@@ -200,7 +200,7 @@ export function disinnesca(testo: string, delimitatore: string): string {
     .split(delimitatore).join('[delimitatore rimosso]')
     // Maiuscole come le scrive il motore: "l'obiettivo dell'utente" in una frase normale non va toccato
     // (lo cancellava, e il collaudo vedeva un buco nel file).
-    .replace(/^.*\b(NOTA DEL MODERATORE|PROBLEMA posto dall\'utente|OBIETTIVO dell\'utente|MATERIALE DI LAVORO|DECISIONE DA COSTRUIRE|STATO DEL PROGRAMMA|RAPPORTI DELLA SQUADRA|IL TUO PACCHETTO)\b.*$/gm, '[riga rimossa: imitava un messaggio del motore]');
+    .replace(/^.*\b(NOTA DEL MODERATORE|PROBLEMA posto dall\'utente|OBIETTIVO dell\'utente|MATERIALE DI LAVORO|DECISIONE DA COSTRUIRE|STATO DEL PROGRAMMA|RAPPORTI DELLA SQUADRA|IL TUO PACCHETTO|ALLEGATI DELL\'UTENTE|NOTE DELL\'UTENTE ARRIVATE DURANTE LA PRODUZIONE|DATI DEL LAVORO APPENA FINITO)\b.*$/gm, '[riga rimossa: imitava un messaggio del motore]');
 }
 
 // ripulisci = false solo per i file scritti da Claude nel cantiere: partono da materiale già ripulito,

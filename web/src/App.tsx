@@ -9,6 +9,7 @@ import { NOME, type Agente } from '../../motore/tipi.ts';
 import { api, type Accessi, type Info, type Riassunto } from './api.ts';
 import { Ambud } from './hud/Ambud.tsx';
 import { Avvisi, Cartello, Scheda, usaReazioni, type SchedaAperta } from './hud/Avvisi.tsx';
+import { usaLargo } from './hud/comuni.tsx';
 import { Barra } from './hud/Barra.tsx';
 import { ComandiDalVivo, ComandiReplay } from './hud/Comandi.tsx';
 import { Dialogo } from './hud/Dialogo.tsx';
@@ -20,6 +21,7 @@ import { INQUADRATURE, type Inquadratura } from './scena/Telecamera.tsx';
 import { Cartelle } from './schermate/Cartelle.tsx';
 import { Chat } from './schermate/Chat.tsx';
 import { Lobby } from './schermate/Lobby.tsx';
+import { usaRiquadroUfficio } from './schermate/Plancia.tsx';
 import { ContestoSquadra } from './squadra.ts';
 import { ETICHETTE_ESITO, ETICHETTE_STATO } from './stato.ts';
 import { usaPartita, type Modo } from './usaPartita.ts';
@@ -74,6 +76,8 @@ export function App() {
     return () => window.removeEventListener('hashchange', f);
   }, []);
   const stretto = usaStretto();
+  const largo = usaLargo();
+  const riquadro = usaRiquadroUfficio();
   const visibile = usaVisibile();
 
   // Tutto è locale: niente accesso da fare, il server è sullo stesso PC.
@@ -107,6 +111,13 @@ export function App() {
   const [ufficio, setUfficio] = useState(false);
   // Sul telefono si parte dalla sala: tutto l'edificio in 375 px rende gli omini illeggibili.
   const [inquadratura, setInquadratura] = useState<Inquadratura>(() => (window.innerWidth < 768 ? 'sala' : 'tutto'));
+  // Sul computer largo l'ufficio sta in un riquadro accanto alla plancia; grande, torna lo sfondo.
+  // La scelta resta su questo computer.
+  const [ufficioGrande, setUfficioGrande] = useState(() => { try { return localStorage.getItem('ambo.ufficio') === 'grande'; } catch { return false; } });
+  const cambiaUfficio = useCallback((grande: boolean) => {
+    setUfficioGrande(grande);
+    try { localStorage.setItem('ambo.ufficio', grande ? 'grande' : 'piccolo'); } catch { /* niente storage */ }
+  }, []);
 
   // Archivio e info: all'avvio, a ogni cambio di stato e ogni 10 secondi.
   // Se il server non risponde lo si dice, invece di mostrare un archivio vuoto.
@@ -181,10 +192,16 @@ export function App() {
 
   // Sul telefono con la chat a tutto schermo la scena non si vede: si ferma.
   const scenaCoperta = entrato && inChat && stretto && !ufficio;
+  const ufficioPiccolo = entrato && inChat && largo && !ufficioGrande;
+  const comandiUfficio = useMemo(() => ({ grande: ufficioGrande, inquadratura, onInquadratura: setInquadratura, onGrande: cambiaUfficio }), [ufficioGrande, inquadratura, cambiaUfficio]);
 
   return (
     <ContestoSquadra.Provider value={squadra}>
-    <div className="fixed inset-0">
+    <div className={`fixed inset-0 ${ufficioPiccolo ? 'bg-[#e4e7eb]' : ''}`}>
+      <div
+        className={ufficioPiccolo ? 'fixed right-3 top-3 overflow-hidden rounded-2xl border-[1.5px] border-[#141518] shadow-[0_2px_0_#141518]' : 'absolute inset-0'}
+        style={ufficioPiccolo ? { width: riquadro.larghezza, height: riquadro.altezza } : undefined}
+      >
       <Scena
         vista={vista}
         invia={invia}
@@ -195,8 +212,9 @@ export function App() {
         onStampante={() => d?.stato === 'concluso' && d.config.tipo !== 'chat' && setDocumento(true)}
         onAgente={inPartita || inChat ? apriAgente : undefined}
         pausa={scenaCoperta}
-        margineSinistro={entrato && inChat && !stretto ? 452 : 0}
+        margineSinistro={entrato && inChat && !stretto && !ufficioPiccolo ? 452 : 0}
       />
+      </div>
       <div className="sr-only" aria-live="polite">{annuncio}</div>
 
       {entrato && inChat && (
@@ -223,6 +241,7 @@ export function App() {
             onPartita={(id) => vai(`#/partita/${id}`)}
             onScheda={apriAgente}
             onCartelle={() => setPannelloCartelle(true)}
+            ufficio={largo ? comandiUfficio : undefined}
           />
         </div>
       )}

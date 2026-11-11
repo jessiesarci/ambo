@@ -1,4 +1,5 @@
 // Chiamate al motore, sullo stesso server locale (http://127.0.0.1:4317): niente parte online.
+import type { Allegato } from '../../motore/allegati.ts';
 import type { Agente, ConfigInput, Corrente, Destinatari, Dibattito, Esito, Evento, MembroSquadra, Procedura, StatoDibattito } from '../../motore/tipi.ts';
 
 export interface Info {
@@ -105,6 +106,32 @@ const locale = {
   riprendi: (id: string) => chiama<{ ok: true }>(`dibattiti/${id}/riprendi`, {}),
   concludi: (id: string) => chiama<{ ok: true }>(`dibattiti/${id}/concludi`, {}),
   nota: (id: string, testo: string) => chiama<{ ok: true }>(`dibattiti/${id}/nota`, { testo }),
+  // Apre la cartella del cantiere in Esplora risorse (o nel Finder).
+  apriCantiere: (id: string) => chiama<{ ok: true }>(`dibattiti/${id}/apri-cantiere`, {}),
+  // Gli allegati di una chat (e la copia di una partita).
+  allegati: (id: string) => chiama<Allegato[]>(`dibattiti/${id}/allegati`),
+  urlAllegato: (id: string, aid: string) => `/api/dibattiti/${id}/allegati/${aid}`,
+  // Con XMLHttpRequest per l'avanzamento: fetch non lo dà durante l'invio.
+  caricaAllegato: (id: string, file: File, avanzamento?: (frazione: number) => void) => new Promise<Allegato>((ok, no) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', `/api/dibattiti/${id}/allegati`);
+    x.setRequestHeader('Content-Type', 'application/octet-stream');
+    x.setRequestHeader('x-nome', encodeURIComponent(file.name));
+    x.upload.onprogress = (e) => { if (e.lengthComputable) avanzamento?.(e.loaded / e.total); };
+    x.onload = () => {
+      let dati: { errore?: string } = {};
+      try { dati = JSON.parse(x.responseText); } catch { /* risposta vuota */ }
+      if (x.status >= 200 && x.status < 300) ok(dati as Allegato);
+      else no(new ErroreChiamata(x.status, dati.errore ?? `errore ${x.status}`));
+    };
+    x.onerror = () => no(new Error('Caricamento interrotto. Riprova.'));
+    x.send(file);
+  }),
+  descriviAllegato: (id: string, aid: string, testo: string) => chiama<Allegato>(`dibattiti/${id}/allegati/${aid}/descrizione`, { testo }),
+  async togliAllegato(id: string, aid: string): Promise<void> {
+    const r = await fetch(`/api/dibattiti/${id}/allegati/${aid}`, { method: 'DELETE' });
+    if (!r.ok) throw new ErroreChiamata(r.status, ((await r.json().catch(() => ({}))) as { errore?: string }).errore ?? `errore ${r.status}`);
+  },
   produci: (id: string, base: string | null) => chiama<{ ok: true }>(`dibattiti/${id}/produzione`, { base }),
   creaChat: (dati: NuovaChat) => chiama<{ id: string }>('chat', dati),
   scrivi: (id: string, testo: string, op: OpzioniMessaggio = {}) => chiama<{ ok: true; indice: number }>(`dibattiti/${id}/scrivi`, { testo, ...op }),

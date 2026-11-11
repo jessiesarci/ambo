@@ -2,6 +2,21 @@
 
 Le versioni seguono il numero in `package.json` e i tag su GitHub (`vX.Y.Z`).
 
+## 0.5.0 · 11 novembre 2026
+
+Il lavoro si segue dalla chat, si vede tutto quello che produce e la produzione va più veloce.
+
+- **Carta del lavoro.** Dopo **Avvia** la scheda compito diventa la carta del lavoro, nello stesso punto della chat: stato, tappe (riunione, sintesi, produzione, collaudo, consegna), chi lavora adesso con le ultime tre azioni, un campo per scrivere alla squadra e, alla fine, tempo, esito del collaudo, ritocchi alla sintesi, anteprima della pagina e **Cosa resta**. I messaggi del motore su quel lavoro stanno nella carta; in chat restano solo gli errori.
+- **Squadra in campo.** In cima alla chat, al posto della riga "2 da decidere · 1 al lavoro", ci sono Claude, Codex e gli assistenti che lavorano adesso, con due parole su cosa fanno. Un tocco apre l'elenco dei lavori e il diario.
+- **Foglio del lavoro su due colonne.** Il tasto del lavoro (**Guarda il lavoro** mentre si lavora, **Apri il lavoro** alla fine) apre tutto: sul computer a sinistra i file prodotti, uno per scheda, e a destra la conclusione, cosa resta per il collaudo, il resoconto di chi ha costruito, la squadra, la riunione in battute e gli allegati. Sul telefono una colonna sola, con i file in alto.
+- **Anteprime di tutti i file.** Le pagine HTML si guardano come su un computer o come su un telefono, i documenti markdown impaginati, il resto come testo. I fogli di stile e le immagini SVG prodotti nello stesso cantiere entrano nella pagina, che resta in una cornice senza script. Non hanno anteprima i file sopra i 20 000 caratteri e quelli che vengono dopo i primi 150 000 caratteri del lavoro. La pagina ha una CSP sua: dalla cornice non esce nessuna richiesta.
+- **Plancia.** Sul computer (da 1024 px) accanto alla chat una scheda per lavoro, con la copertina di quello che ha prodotto: prima i lavori della chat (anche quelli avviati con **Trasforma in compito**), poi gli ultimi altri lavori al lavoro o con una produzione. L'ufficio 3D passa in un riquadro in alto a destra e si ingrandisce con un tasto.
+- **Allegati.** Immagini PNG, JPEG e WebP, PDF e file di testo dal PC, con la graffetta, trascinandoli sul campo di scrittura o incollandoli. Immagini e PDF si riconoscono dal contenuto, i testi devono essere UTF-8 con un'estensione ammessa, gli SVG si rifiutano. Le foto perdono posizione e altri metadati (anche quelli nascosti tra le scansioni di un JPEG o in blocchi privati di PNG e WebP); nei testi i valori che sembrano credenziali diventano un segnaposto. In chat e in riunione gli agenti leggono testi e descrizioni come dati; in produzione i file stanno nella cartella `allegati/` del cantiere.
+- **Produzione in parallelo.** La sintesi dice da quali pacchetti dipende ognuno: quelli indipendenti si costruiscono insieme, al massimo 3 (`AMBO_INSIEME`, da 1 a 4). Se un pacchetto non riesce, la produzione si ferma con un errore: quelli che lavorano insieme a lui si interrompono (nelle statistiche della squadra non contano come falliti) e quelli in attesa non partono. Il LEGGIMI.md lo aggiorna un solo pacchetto, l'ultimo a partire. Il collaudo di Codex e le revisioni della procedura leggono i file nello stesso momento.
+- **Nota durante la produzione.** Mentre la produzione lavora, una nota alla squadra arriva al prossimo pacchetto o alla prossima correzione e al collaudo di Codex, se non è già cominciato. Durante il collaudo la leggono solo le correzioni, e il programma lo dice. Durante la sintesi il campo non c'è: la nota non arriverebbe a nessuno.
+- **Riepilogo di fine lavoro.** A lavoro finito chi apre la chat scrive da solo cosa è pronto, dove sono i file, cosa resta e cosa conviene fare, con i dati veri del lavoro. Ogni riepilogo è una chiamata in più: uno a fine riunione, se la produzione non parte da sola, e uno a fine produzione. **Ferma** ferma anche il riepilogo.
+- **Apri la cartella.** Dalla carta o dal foglio del lavoro il programma apre la cartella del cantiere sul PC.
+
 ## 0.4.0 · 10 novembre 2026
 
 Ambo ha un volto: Ambud.

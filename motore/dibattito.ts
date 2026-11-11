@@ -14,9 +14,10 @@ import {
   CARTELLA_DATI, MODELLO_CLAUDE_PREDEFINITO, modelloCodexPredefinito, RADICE, RAGIONAMENTO_CLAUDE, RAGIONAMENTO_CODEX,
   verificaAccessi, type Accessi,
 } from './ambiente.ts';
+import { allegatiPerPrompt, firmaAllegati, passaAllegati } from './allegati.ts';
 import { creaArchivio, nuovoId, type Archivio } from './archivio.ts';
 import { creaDossier, disinnesca, elencoCartelle, trovaCartella } from './cartelle.ts';
-import { contestoDaChat, destinatari, leggiProposta, passa, prossimaRisposta, prossimoIndice, promptChat, titoloChat, ultimoDellUtente } from './chat.ts';
+import { contestoDaChat, datiFineLavoro, destinatari, leggiProposta, messaggiChat, passa, prossimaRisposta, prossimoIndice, promptChat, titoloChat, ultimoDaRispondere } from './chat.ts';
 import { cartellaNoteSalvate, scriviNota, scriviNotaChat } from './obsidian.ts';
 import { descriviFonti, IMPOSTAZIONI, noteAttive, scriviFontiNote } from './impostazioni.ts';
 import { ErroreFormato, leggiRisposta, type RispostaChat } from './formato.ts';
@@ -359,8 +360,11 @@ export class Motore extends EventEmitter {
     // Partita nata da una chat: le ultime battute, lette adesso come il materiale.
     const origine = cfg.daChat ? this.istantanea(cfg.daChat) : undefined;
     if (cfg.daChat && !eChat(origine)) throw new Error('la chat di partenza non esiste');
+    const id = nuovoId();
+    // Gli allegati della chat in questo momento diventano della partita: copia e sezione dei prompt.
+    const allegati = origine ? passaAllegati(this.dati, origine.id, id) : [];
     const d: Dibattito = {
-      id: nuovoId(),
+      id,
       creato: ora,
       aggiornato: ora,
       config: cfg,
@@ -373,12 +377,14 @@ export class Motore extends EventEmitter {
       ...(dossier ? { dossier } : {}),
       ...(cfg.tipo === 'chat' ? { chat: [], letti: {} } : {}),
       ...(origine ? { contestoChat: contestoPerPartita(origine) } : {}),
+      ...(allegati.length ? { allegati: { elenco: allegati, testo: allegatiPerPrompt(this.dati, id) } } : {}),
     };
     this.archivio.salva(d);
     // La chat da cui nasce lo sa subito: L'utente vede dov'è finito il compito, gli agenti che esiste.
     if (origine) {
       const dopo = cfg.poiProduzione ? ' Con l\'accordo pieno la decisione va in produzione da sola.' : ' Alla fine la mandi in produzione dalla partita.';
-      this.notaInChat(origine.id, `Partita avviata: «${titoloPartita(d)}». Claude e Codex preparano il piano in riunione, con la squadra se serve.${dopo}`, { tipo: 'avviata', partita: d.id, ...(cfg.daProposta ? { proposta: cfg.daProposta } : {}) });
+      const conAllegati = allegati.length ? ` Con ${allegati.length === 1 ? 'un allegato' : `${allegati.length} allegati`} della chat.` : '';
+      this.notaInChat(origine.id, `Partita avviata: «${titoloPartita(d)}». Claude e Codex preparano il piano in riunione, con la squadra se serve.${conAllegati}${dopo}`, { tipo: 'avviata', partita: d.id, ...(cfg.daProposta ? { proposta: cfg.daProposta } : {}) });
     }
     return d;
   }
@@ -403,15 +409,18 @@ export class Motore extends EventEmitter {
 
   // Il motore scrive in chat un fatto vero. Se la chat sta rispondendo si scrive nella sua copia in
   // memoria (la salva anche il giro in corso); se la usa un altro processo, niente.
-  private notaInChat(chatId: string, testo: string, evento?: MessaggioChat['evento']): void {
+  // riepilogo: a fine lavoro chi apre la chat risponde al fatto con il riepilogo (come dopo un messaggio dell'utente).
+  private notaInChat(chatId: string, testo: string, evento?: MessaggioChat['evento'], riepilogo = false): void {
     const inMem = this.inMemoria.get(chatId);
     if (!inMem && this.bloccatoAltrove(chatId)) return;
     const chat = inMem ?? this.archivio.carica(chatId);
     if (!chat || !eChat(chat)) return;
-    const m: MessaggioChat = { indice: prossimoIndice(chat), autore: 'motore', testo, ora: new Date().toISOString(), ...(evento ? { evento } : {}) };
+    const chi = chat.config.apre ?? 'claude';
+    const m: MessaggioChat = { indice: prossimoIndice(chat), autore: 'motore', testo, ora: new Date().toISOString(), ...(evento ? { evento } : {}), ...(riepilogo ? { a: [chi] } : {}) };
     chat.chat!.push(m);
     this.archivio.salva(chat);
     this.emetti(chat, { tipo: 'messaggio', messaggio: m });
+    if (riepilogo && !this.attivi.has(chatId)) this.rispondi(chatId);
   }
 
   // Quello che succede a una partita nata da una chat si racconta in quella chat.
@@ -424,7 +433,9 @@ export class Motore extends EventEmitter {
         : d.config.poiProduzione && e.esito === 'accordo' ? ' La mando in produzione.'
           : d.config.poiProduzione ? ' Senza accordo pieno la produzione non parte da sola: decidi tu.'
             : '';
-      this.notaInChat(chat, `Partita «${t}» conclusa: ${ESITO_BREVE[e.esito]}${d.verifica ? `, sintesi ${d.verifica.testo.approvata ? 'approvata' : 'non approvata'} da ${NOME[d.verifica.revisore]}` : ''}.${dopo}`, { tipo: 'conclusa', ...base });
+      // Se la produzione parte da sola il riepilogo arriva alla sua fine; altrimenti adesso.
+      const finito = !d.produzione && !(d.config.poiProduzione && e.esito === 'accordo');
+      this.notaInChat(chat, `Partita «${t}» conclusa: ${ESITO_BREVE[e.esito]}${d.verifica ? `, sintesi ${d.verifica.testo.approvata ? 'approvata' : 'con ritocchi'} da ${NOME[d.verifica.revisore]}` : ''}.${dopo}`, { tipo: 'conclusa', ...base }, finito);
     } else if (e.tipo === 'errore' && !eChat(d)) {
       this.notaInChat(chat, `Partita «${t}» ferma per un errore: ${e.messaggio.split('\n')[0]}`, { tipo: 'errore', ...base });
     } else if (e.tipo === 'produzione' && (e.stato === 'pronta' || e.stato === 'errore' || e.stato === 'fermata')) {
@@ -432,7 +443,8 @@ export class Motore extends EventEmitter {
       const testo = e.stato === 'pronta'
         ? `Produzione «${t}» pronta: ${p.file.length} file, ${p.collaudo?.approvato ? 'collaudo superato' : `respinta dal collaudo (${p.collaudo?.problemi.length ?? 0} problemi${p.giri?.length ? ` dopo ${p.giri.length + 1} giri` : ''})`}.`
         : e.stato === 'errore' ? `Produzione «${t}» ferma per un errore: ${(p.errore ?? '').split('\n')[0]}` : `Produzione «${t}» fermata.`;
-      this.notaInChat(chat, testo, { tipo: 'produzione', ...base });
+      // Fermata dall'utente: lo sa già, niente riepilogo.
+      this.notaInChat(chat, testo, { tipo: 'produzione', ...base }, e.stato !== 'fermata');
     }
   }
 
@@ -485,7 +497,7 @@ export class Motore extends EventEmitter {
     if (!d || !eChat(d) || this.attivi.has(id) || this.bloccatoAltrove(id)) return false;
     if (d.saltaFino) {
       // Quello che era stato fermato torna da rispondere: solo l'ultimo messaggio dell'utente conta.
-      d.saltaFino = Math.max(0, ultimoDellUtente(d) - 1);
+      d.saltaFino = Math.max(0, ultimoDaRispondere(d) - 1);
       this.archivio.salva(d);
     }
     if (!prossimaRisposta(d)) return false;
@@ -542,12 +554,12 @@ export class Motore extends EventEmitter {
       } catch (e) {
         if (e instanceof Annullato) {
           // Il limite l'ha fissato pausa() al momento dello stop: un messaggio arrivato dopo avrà risposta.
-          d.saltaFino = Math.max(d.saltaFino ?? 0, es.fermoFino ?? ultimoDellUtente(d));
+          d.saltaFino = Math.max(d.saltaFino ?? 0, es.fermoFino ?? ultimoDaRispondere(d));
           this.cambiaStato(d, 'aperta');
           this.emetti(d, { tipo: 'avviso', testo: 'Risposte fermate.' });
         } else {
           // Errore: quello che resta senza risposta non riparte da solo.
-          d.saltaFino = ultimoDellUtente(d);
+          d.saltaFino = ultimoDaRispondere(d);
           const err = e instanceof ErroreAgente ? e : new ErroreAgente((e as Error).message, 'altro', true);
           if (err.tipo === 'accesso') this.accessiChat = undefined;
           if (err.tipo === 'consumo' && agenteDelGiro) this.consumoBloccato.set(agenteDelGiro, err.message);
@@ -591,9 +603,14 @@ export class Motore extends EventEmitter {
     };
     this.on('evento', ascolta);
     let esito: { valore: RispostaChat; chiamata: Chiamata };
+    // Gli allegati della chat arrivano all'agente la prima volta e poi solo quando cambiano.
+    const firma = firmaAllegati(this.dati, d.id);
     try {
       esito = await this.chiedi(d, es, agente, 'chat', () => {
-        const p = promptChat(d, agente, fino, this.statoPerChat(d));
+        const fatto = messaggiChat(d).find((x) => x.indice === fino);
+        const lavoro = fatto?.autore === 'motore' && fatto.evento?.partita ? this.istantanea(fatto.evento.partita) : undefined;
+        const allegati = firma && (!d.sessioni[agente] || d.allegatiVisti?.[agente] !== firma) ? allegatiPerPrompt(this.dati, d.id, 12_000) : '';
+        const p = promptChat(d, agente, fino, this.statoPerChat(d), lavoro ? datiFineLavoro(lavoro, titoloPartita(lavoro)) : undefined, allegati);
         vede = p.vede;
         return p.testo;
       });
@@ -618,6 +635,8 @@ export class Motore extends EventEmitter {
     };
     d.chat!.push(m);
     d.letti = { ...d.letti, [agente]: vede };
+    if (firma) d.allegatiVisti = { ...d.allegatiVisti, [agente]: firma };
+    else delete d.allegatiVisti;
     this.archivio.salva(d);
     this.emetti(d, { tipo: 'messaggio', messaggio: m });
   }
@@ -659,7 +678,7 @@ export class Motore extends EventEmitter {
         // Una chat interrotta torna aperta: quello che era senza risposta lo si rifà con "Riprova".
         if (eChat(d)) {
           d.stato = 'aperta';
-          d.saltaFino = ultimoDellUtente(d);
+          d.saltaFino = ultimoDaRispondere(d);
           this.archivio.salva(d);
           recuperati.push(d.id);
           continue;
@@ -780,7 +799,7 @@ export class Motore extends EventEmitter {
     es.richiesta = 'pausa';
     // In chat lo stop vale per quello che c'era fino a qui, non per un messaggio scritto subito dopo.
     const d = this.inMemoria.get(id);
-    if (eChat(d)) es.fermoFino = ultimoDellUtente(d!);
+    if (eChat(d)) es.fermoFino = ultimoDaRispondere(d!);
     es.controllo.abort();
     return true;
   }
@@ -816,7 +835,17 @@ export class Motore extends EventEmitter {
     const t = testo.trim();
     if (!t) return false;
     const d = this.inMemoria.get(id) ?? this.archivio.carica(id);
-    if (!d || eChat(d) || d.stato === 'concluso' || d.esito || (!this.inMemoria.has(id) && this.bloccatoAltrove(id))) return false;
+    if (!d || eChat(d) || (!this.inMemoria.has(id) && this.bloccatoAltrove(id))) return false;
+    // A riunione finita la nota serve solo se la produzione sta lavorando: la legge il prossimo
+    // assistente che parte (pacchetto, correzione o collaudo).
+    if (d.stato === 'concluso' || d.esito) {
+      const p = d.produzione;
+      if (!p || (p.stato !== 'in_lavorazione' && p.stato !== 'collaudo')) return false;
+      d.interventi.push({ ora: new Date().toISOString(), testo: t });
+      this.archivio.salva(d);
+      this.emetti(d, { tipo: 'intervento', testo: t });
+      return true;
+    }
     d.interventi.push({ ora: new Date().toISOString(), testo: t });
     d.daConsegnare.claude.push(t);
     d.daConsegnare.codex.push(t);

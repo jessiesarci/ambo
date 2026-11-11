@@ -1,6 +1,7 @@
 // Server locale della dashboard: API, eventi in tempo reale (SSE) e file della UI.
 // Ascolta solo su 127.0.0.1: da fuori non si raggiunge, e non c'è nessuna parte online.
 //   npm start   (oppure: node --env-file-if-exists=.env motore/server.ts)
+import { spawn } from 'node:child_process';
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
@@ -8,11 +9,12 @@ import {
   CARTELLA_DATI, MODELLI_CLAUDE, MODELLO_CLAUDE_PREDEFINITO, modelliCodex, modelloCodexPredefinito, RADICE,
   RAGIONAMENTO_CLAUDE, RAGIONAMENTO_CODEX, verificaAccessi, type Accessi,
 } from './ambiente.ts';
+import { aggiungiAllegato, descriviAllegato, elencoAllegati, ErroreAllegato, LIMITI as LIMITI_ALLEGATI, MIME, togliAllegato, trovaAllegato } from './allegati.ts';
 import { aggiungiCartella, elencoCartelle, riepilogoCartelle, rimuoviCartella } from './cartelle.ts';
 import { attivo, carica as caricaDibattito, ErroreComando, esegui, riassunto } from './comandi.ts';
 import { IMPOSTAZIONI, riepilogoImpostazioni, scriviFontiNote } from './impostazioni.ts';
 import { skillDisponibili } from './skill.ts';
-import { Motore } from './dibattito.ts';
+import { eChat, Motore } from './dibattito.ts';
 import type { Dibattito, Evento } from './tipi.ts';
 import { AUDIO_MAX, estensioneAudio, Trascrittore } from './voce.ts';
 
@@ -159,7 +161,7 @@ function eventi(req: IncomingMessage, res: ServerResponse, id: string): void {
 
 async function api(req: IncomingMessage, res: ServerResponse, percorso: string[]): Promise<void> {
   const metodo = req.method ?? 'GET';
-  const [, risorsa, id, azione] = percorso;
+  const [, risorsa, id, azione, ...resto] = percorso;
 
   if (risorsa === 'info' && metodo === 'GET') return json(res, 200, info());
   if (risorsa === 'accessi' && metodo === 'GET') return json(res, 200, await accessiRecenti());
@@ -189,13 +191,90 @@ async function api(req: IncomingMessage, res: ServerResponse, percorso: string[]
     });
     return void createReadStream(file).pipe(res);
   }
+  if (azione === 'apri-cantiere' && metodo === 'POST') return apriCantiere(res, id);
+  if (azione === 'allegati') return apiAllegati(req, res, id, resto, metodo);
   if (metodo !== 'POST') throw new ErroreHttp(405, 'metodo non ammesso');
   if (!azione || !AZIONI.includes(azione)) throw new ErroreHttp(404, 'azione sconosciuta');
   return json(res, 200, comando(azione, id, CON_CORPO.includes(azione) ? await leggiCorpo(req) : undefined));
 }
 
 const AZIONI = ['pausa', 'riprendi', 'concludi', 'nota', 'produzione', 'scrivi', 'salva', 'avvia'];
+
+// Apre in Esplora risorse (o nel Finder) la cartella del cantiere di questa partita. Il percorso
+// viene dalla partita e deve stare dentro dati/cantieri.
+function apriCantiere(res: ServerResponse, id: string): void {
+  const d = carica(id);
+  const cantiere = d.produzione?.cantiere ? resolve(d.produzione.cantiere) : '';
+  const radice = resolve(CARTELLA_DATI, 'cantieri');
+  if (!cantiere || !cantiere.startsWith(radice + sep) || !existsSync(cantiere)) throw new ErroreHttp(404, 'questa partita non ha una cartella del cantiere');
+  const apri = process.platform === 'win32' ? 'explorer.exe' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+  spawn(apri, [cantiere], { detached: true, stdio: 'ignore', windowsHide: false }).on('error', () => undefined).unref();
+  json(res, 200, { ok: true });
+}
 const CON_CORPO = ['nota', 'produzione', 'scrivi', 'avvia'];
+
+// Gli allegati di una chat (e la copia che ne ha una partita). Si caricano e si cambiano solo nelle
+// chat; di una partita si guardano. Il nome arriva nell'intestazione x-nome (codifica URI) ed è solo
+// un'indicazione: il tipo lo decidono i byte, il nome lo pulisce il motore. Il file si legge a flusso e
+// la richiesta si ferma appena supera il limite. Un id sbagliato e un allegato di un'altra chat danno
+// la stessa risposta.
+async function apiAllegati(req: IncomingMessage, res: ServerResponse, id: string, [aid, cosa]: string[], metodo: string): Promise<void> {
+  const d = carica(id);
+  const nonTrovato = () => new ErroreHttp(404, 'allegato non trovato');
+  if (!aid) {
+    if (metodo === 'GET') return json(res, 200, elencoAllegati(CARTELLA_DATI, id));
+    if (metodo !== 'POST') throw new ErroreHttp(405, 'metodo non ammesso');
+    if (!eChat(d)) throw new ErroreHttp(409, 'gli allegati si aggiungono nella chat');
+    let nome = 'allegato';
+    try {
+      nome = decodeURIComponent(String(req.headers['x-nome'] ?? 'allegato')).slice(0, 400);
+    } catch { /* nome illeggibile: si usa quello di base */ }
+    const dichiarati = Number(req.headers['content-length'] ?? 0);
+    if (dichiarati > LIMITI_ALLEGATI.richiesta) throw new ErroreHttp(413, `il file supera i ${LIMITI_ALLEGATI.richiesta / 1024 / 1024} MB`);
+    let dimensione = 0;
+    const parti: Buffer[] = [];
+    for await (const pezzo of req) {
+      dimensione += (pezzo as Buffer).length;
+      if (dimensione > LIMITI_ALLEGATI.richiesta) {
+        res.setHeader('Connection', 'close');
+        throw new ErroreHttp(413, `il file supera i ${LIMITI_ALLEGATI.richiesta / 1024 / 1024} MB`);
+      }
+      parti.push(pezzo as Buffer);
+    }
+    try {
+      return json(res, 201, aggiungiAllegato(CARTELLA_DATI, id, Buffer.concat(parti), nome));
+    } catch (e) {
+      if (e instanceof ErroreAllegato) throw new ErroreHttp(422, e.message);
+      throw e;
+    }
+  }
+  const trovato = trovaAllegato(CARTELLA_DATI, id, aid);
+  if (!trovato) throw nonTrovato();
+  if (!cosa && metodo === 'GET') {
+    const { allegato: a, percorso } = trovato;
+    const immagine = a.tipo === 'png' || a.tipo === 'jpeg' || a.tipo === 'webp';
+    res.writeHead(200, {
+      'Content-Type': MIME[a.tipo],
+      'Content-Length': statSync(percorso).size,
+      // Le immagini si mostrano nella pagina; il resto si scarica e non si apre mai come pagina.
+      'Content-Disposition': `${immagine ? 'inline' : 'attachment'}; filename="${a.file}"; filename*=UTF-8''${encodeURIComponent(a.nome)}`,
+      'Content-Security-Policy': "default-src 'none'; sandbox",
+      'Cache-Control': 'private, no-store',
+    });
+    return void createReadStream(percorso).pipe(res);
+  }
+  if (!eChat(d)) throw new ErroreHttp(409, 'gli allegati di una partita non si cambiano');
+  if (!cosa && metodo === 'DELETE') {
+    togliAllegato(CARTELLA_DATI, id, aid);
+    return json(res, 200, { ok: true });
+  }
+  if (cosa === 'descrizione' && metodo === 'POST') {
+    const corpo = (await leggiCorpo(req)) as { testo?: unknown };
+    if (typeof corpo.testo !== 'string') throw new ErroreHttp(400, 'manca il testo');
+    return json(res, 200, descriviAllegato(CARTELLA_DATI, id, aid, corpo.testo));
+  }
+  throw new ErroreHttp(405, 'metodo non ammesso');
+}
 
 // Messaggio vocale: l'audio grezzo nel corpo, il testo nella risposta.
 async function apiVoce(req: IncomingMessage, res: ServerResponse, metodo: string): Promise<void> {
@@ -287,6 +366,8 @@ const server = createServer(async (req, res) => {
   res.setHeader('X-Frame-Options', 'DENY');
   try {
     if (!HOST_AMMESSI.has(req.headers.host ?? '')) throw new ErroreHttp(421, 'host non ammesso');
+    // Un .. (anche scritto %2e%2e) il parser degli URL lo risolve prima delle rotte: si rifiuta prima.
+    if (/\.\.|%2e/i.test(req.url ?? '')) throw new ErroreHttp(400, 'percorso non valido');
     const url = new URL(req.url ?? '/', 'http://locale');
     const metodo = req.method ?? 'GET';
     if (metodo !== 'GET' && metodo !== 'HEAD') {

@@ -145,6 +145,18 @@ export function usaFinestra(onChiudi: () => void, modale = true) {
   return pannello;
 }
 
+// Computer largo, da 1024 px (lg: di Tailwind): la plancia accanto alla chat e i fogli su due colonne.
+export function usaLargo(): boolean {
+  const [l, setL] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const m = window.matchMedia('(min-width: 1024px)');
+    const f = () => setL(m.matches);
+    m.addEventListener('change', f);
+    return () => m.removeEventListener('change', f);
+  }, []);
+  return l;
+}
+
 // "1 messaggio", "3 messaggi": il numero col nome giusto.
 export const quanti = (n: number, uno: string, molti: string) => `${n} ${n === 1 ? uno : molti}`;
 
