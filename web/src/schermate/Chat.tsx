@@ -2,7 +2,7 @@
 // (o chi sceglie), e intanto si vede cosa stanno facendo: chi pensa, chi cerca nelle note, chi scrive.
 // Da qui una conversazione diventa un compito (una partita e poi la produzione).
 import {
-  ArrowUpRight, Box, Check, Copy, Cpu, Ellipsis, FolderLock, ListChecks, LoaderCircle, Menu, MessageSquare, Mic, NotebookPen, Pause, Plus, RotateCcw, SendHorizontal, Timer, Volume2, VolumeX, X,
+  ArrowUpRight, Box, Bug, Check, Copy, Cpu, Ellipsis, FolderLock, ListChecks, LoaderCircle, Menu, MessageSquare, Mic, NotebookPen, Pause, Plus, RotateCcw, SendHorizontal, Timer, Volume2, VolumeX, X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { NOME, nomeAutore, type Agente, type Destinatari, type Dibattito, type MessaggioChat } from '../../../motore/tipi.ts';
@@ -583,6 +583,7 @@ export interface PropsChat {
   onScheda?: (a: Agente) => void; // la scheda dell'agente: cosa fa, cosa ha usato, le sue skill
   onChiudiErrore?: () => void;
   onCartelle?: () => void;
+  onRapporti?: () => void; // i rapporti d'errore: chiedi, sempre o mai
   ufficio?: ComandiUfficio; // sul computer largo: il riquadro dell'ufficio 3D accanto alla plancia
 }
 
@@ -791,6 +792,7 @@ export function Chat(p: PropsChat) {
                 {puoLeggere() && <Voce icona={leggiSempre === 'si' ? <VolumeX size={16} /> : <Volume2 size={16} />} onClick={() => { setMenu(false); setLeggiSempre(leggiSempre === 'si' ? 'no' : 'si'); if (leggiSempre === 'si') smettiDiLeggere(); }}>{leggiSempre === 'si' ? 'Non leggere più le risposte' : 'Leggi le risposte ad alta voce'}</Voce>}
                 {puoDettare() && <Voce icona={<Mic size={16} />} onClick={() => { setMenu(false); setModoVoce(modoVoce === 'pc' ? 'browser' : 'pc'); }}>{modoVoce === 'pc' ? 'Voce: dettatura del browser (passa dal servizio del browser)' : 'Voce: trascrivi sul PC (resta sul PC, più precisa)'}</Voce>}
                 <Voce icona={<ListChecks size={16} />} onClick={() => { setMenu(false); p.onPartite(); }}>Partite e produzione</Voce>
+                {p.onRapporti && <Voce icona={<Bug size={16} />} onClick={() => { setMenu(false); p.onRapporti!(); }}>Rapporti d'errore</Voce>}
                 {p.onCartelle && <Voce icona={<FolderLock size={16} />} onClick={() => { setMenu(false); p.onCartelle!(); }}>Cartelle autorizzate</Voce>}
               </div>
             </>

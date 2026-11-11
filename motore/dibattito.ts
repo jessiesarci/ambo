@@ -297,6 +297,8 @@ export interface OpzioniMotore {
   operai?: Operai;
   vault?: string | null; // dove scrivere le note delle decisioni; null = da nessuna parte
   cartellaAgenti?: string | null; // gli agenti dell'utente (~/.claude/agents); null = solo gli standard
+  // Un errore che può essere un difetto del programma: per il rapporto d'errore, se l'utente lo vuole.
+  segnala?: (e: unknown, dove: 'chat' | 'riunione' | 'produzione') => void;
 }
 
 export class Motore extends EventEmitter {
@@ -306,6 +308,7 @@ export class Motore extends EventEmitter {
   private readonly stanza: string;
   private readonly dati: string;
   private readonly operai: Operai;
+  private readonly segnala: NonNullable<OpzioniMotore['segnala']>;
   private readonly vault: string | null;
   private readonly agenti: string | null;
   private readonly attivi = new Map<string, Esecuzione>();
@@ -333,6 +336,7 @@ export class Motore extends EventEmitter {
     mkdirSync(this.stanza, { recursive: true });
     this.dati = dati;
     this.operai = op.operai ?? operaiReali(this.stanza);
+    this.segnala = op.segnala ?? (() => undefined);
     // Le note salvate vere solo per il motore vero: i test (con una cartella dati loro) non le toccano.
     this.vault = op.vault !== undefined ? op.vault : op.cartellaDati ? null : cartellaNoteSalvate();
     // Gli agenti dell'utente (~/.claude/agents) solo con l'ambiente acceso (AMBO_AMBIENTE=1). I test
@@ -561,6 +565,7 @@ export class Motore extends EventEmitter {
           // Errore: quello che resta senza risposta non riparte da solo.
           d.saltaFino = ultimoDaRispondere(d);
           const err = e instanceof ErroreAgente ? e : new ErroreAgente((e as Error).message, 'altro', true);
+          this.segnala(e, 'chat');
           if (err.tipo === 'accesso') this.accessiChat = undefined;
           if (err.tipo === 'consumo' && agenteDelGiro) this.consumoBloccato.set(agenteDelGiro, err.message);
           d.errore = { messaggio: err.message, recuperabile: err.recuperabile, ora: new Date().toISOString() };
@@ -772,6 +777,7 @@ export class Motore extends EventEmitter {
         await lavora(d, {
           dati: this.dati, base, operai: this.operai, signal: es.controllo.signal, aggiorna, catalogo,
           attivita: (assistente, testo) => this.emetti(d, { tipo: 'attivita_assistente', assistente, fase: 'strumento', testo, strumento: 'file' }),
+          segnala: (e) => this.segnala(e, 'produzione'),
         });
         this.archivio.salvaMarkdown(d.id, inMarkdown(d));
         return d;
@@ -953,6 +959,7 @@ export class Motore extends EventEmitter {
       }
     } catch (e) {
       const err = e instanceof ErroreAgente ? e : new ErroreAgente((e as Error).message, 'altro', false);
+      this.segnala(e, 'riunione');
       d.errore = { messaggio: err.message, recuperabile: err.recuperabile, ora: new Date().toISOString() };
       this.cambiaStato(d, 'errore');
       this.emetti(d, { tipo: 'errore', messaggio: err.message, recuperabile: err.recuperabile });

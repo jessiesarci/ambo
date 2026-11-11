@@ -2,6 +2,15 @@
 
 Le versioni seguono il numero in `package.json` e i tag su GitHub (`vX.Y.Z`).
 
+## 0.6.0 · 11 novembre 2026
+
+Rapporti d'errore, solo se li vuoi.
+
+- **Rapporti d'errore.** Quando nel programma si rompe qualcosa, una scheda chiede se mandare il rapporto a chi sviluppa Ambo. Con **Cosa contiene** lo vedi esattamente come partirebbe: versione, sistema, dove e che tipo di errore, una riga di messaggio e i punti del codice del programma. Gli errori delle CLI hanno un messaggio fisso; dagli altri si tolgono testi tra virgolette, percorsi, email e segreti. Mai chat, file, note o percorsi, e niente che identifichi te o il PC.
+- **La scelta è tua.** **Manda**, **Manda sempre** (al massimo 20 al giorno, anche dopo un riavvio) o **Non mandare**; dal menu ⋯, alla voce **Rapporti d'errore**, si cambia quando vuoi. Con `AMBO_RAPPORTI_URL=0` sono spenti del tutto.
+- **Solo i difetti.** Login mancante, crediti a consumo, limiti di quota, sessione scaduta, arresti di sicurezza, stop e richieste rifiutate non diventano rapporti.
+- **Dove vanno.** In un servizio su Supabase con il server a Zurigo, che accetta solo i campi previsti, non salva l'indirizzo IP e ogni notte cancella gli errori fermi da più di 180 giorni. Il suo codice è in `servizio/rapporti`. Tutto spiegato in [docs/RAPPORTI-ERRORE.md](docs/RAPPORTI-ERRORE.md).
+
 ## 0.5.0 · 11 novembre 2026
 
 Il lavoro si segue dalla chat, si vede tutto quello che produce e la produzione va più veloce.

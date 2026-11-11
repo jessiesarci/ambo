@@ -19,6 +19,7 @@ import type { ScatolaArchivio } from './scena/Edificio.tsx';
 import { Scena } from './scena/Scena.tsx';
 import { INQUADRATURE, type Inquadratura } from './scena/Telecamera.tsx';
 import { Cartelle } from './schermate/Cartelle.tsx';
+import { PannelloRapporti, SchedaRapporto } from './schermate/Rapporti.tsx';
 import { Chat } from './schermate/Chat.tsx';
 import { Lobby } from './schermate/Lobby.tsx';
 import { usaRiquadroUfficio } from './schermate/Plancia.tsx';
@@ -107,6 +108,7 @@ export function App() {
   const [errore, setErrore] = useState<string>();
   const [serverGiu, setServerGiu] = useState(false);
   const [pannelloCartelle, setPannelloCartelle] = useState(false);
+  const [pannelloRapporti, setPannelloRapporti] = useState(false);
   // Sul telefono la chat occupa tutto lo schermo; l'ufficio si guarda a richiesta.
   const [ufficio, setUfficio] = useState(false);
   // Sul telefono si parte dalla sala: tutto l'edificio in 375 px rende gli omini illeggibili.
@@ -241,6 +243,7 @@ export function App() {
             onPartita={(id) => vai(`#/partita/${id}`)}
             onScheda={apriAgente}
             onCartelle={() => setPannelloCartelle(true)}
+            onRapporti={() => setPannelloRapporti(true)}
             ufficio={largo ? comandiUfficio : undefined}
           />
         </div>
@@ -343,6 +346,9 @@ export function App() {
       {documento && d && !inChat && <Risultato dibattito={d} onChiudi={() => setDocumento(false)} onRivedi={rotta.schermo !== 'replay' && d.stato === 'concluso' ? () => vai(`#/replay/${d.id}`) : undefined} cartelle={rotta.schermo === 'replay' ? [] : info?.cartelle ?? []} soloLettura={rotta.schermo === 'replay'} />}
       {!inChat && <Cartello esito={cartello} />}
       {pannelloCartelle && <Cartelle onChiudi={() => { setPannelloCartelle(false); aggiorna(); }} />}
+      {/* Un errore del programma: si chiede se mandare il rapporto (solo con la scelta "chiedi"). */}
+      {entrato && !pannelloRapporti && <SchedaRapporto info={info} onCambia={aggiorna} />}
+      {pannelloRapporti && <PannelloRapporti onChiudi={() => { setPannelloRapporti(false); aggiorna(); }} />}
     </div>
     </ContestoSquadra.Provider>
   );

@@ -80,6 +80,14 @@ Il programma resta sul PC dell'utente. Non aggiungere:
 - server pubblici, tunnel (ngrok, cloudflared e simili), ponti o relay online;
 - account, login del programma, telemetria, analisi d'uso, chiamate a servizi esterni.
 
+L'unica chiamata a un servizio esterno, oltre alle CLI, sono i rapporti d'errore (`motore/rapporti.ts`, spiegati in [docs/RAPPORTI-ERRORE.md](docs/RAPPORTI-ERRORE.md)), voluti da chi sviluppa il programma. Le loro regole valgono come queste:
+- partono solo con il consenso dell'utente: la scelta di serie è «chiedi» e non va cambiata;
+- con «mai» o `AMBO_RAPPORTI_URL=0` non si prepara niente;
+- li manda il motore, non la pagina;
+- hanno solo i campi fissi del tipo `Contenuto` (id e ora restano sul PC), e gli errori delle CLI un messaggio fisso: non aggiungere campi né dati della chat, dei file, delle note, dei percorsi o dell'utente, e non togliere la pulizia del messaggio;
+- niente identificativi dell'installazione o dell'utente.
+Se una modifica tocca i rapporti, aggiorna anche docs/RAPPORTI-ERRORE.md.
+
 Fa eccezione solo una richiesta esplicita dell'utente, dopo che gli hai spiegato i rischi: chiunque raggiunga il server può usare i suoi abbonamenti, leggere le sue chat e le cartelle autorizzate e far scrivere file. Anche in quel caso le regole 1-5 restano.
 
 ### 7. Dopo ogni modifica
@@ -126,6 +134,7 @@ motore/            il motore Node: server, chat, partite, produzione
   squadra.ts       catalogo degli assistenti (di serie e dell'utente), procedure, XP e livelli, tetti
   produzione.ts    cantiere, pacchetti (anche insieme), collaudo, revisioni, correzioni
   allegati.ts      allegati delle chat: tipo dai byte, metadati tolti, limiti, copia nel cantiere
+  rapporti.ts      rapporti d'errore: campi fissi ripuliti, scelta dell'utente (chiedi, sempre, mai), invio
   procedure/       procedure di serie (JSON): sito web, documento, analisi, codice, su misura
   agenti/          come si lanciano le CLI: claude.ts, codex.ts, cantiere.ts
   processo.ts      avvio dei processi e pulizia dell'ambiente
@@ -146,11 +155,12 @@ web/               dashboard React + Three (Vite, Tailwind)
   public/hdri/     luci HDRI (CC0)
 test/              test con node:test
 strumenti/         script di servizio
+servizio/rapporti/ il servizio che riceve i rapporti d'errore (funzione Edge di Supabase e tabella), fuori dal programma
 docs/              documentazione
 dati/              creata all'avvio, fuori dal repository: chat, partite, cantieri, allegati, note salvate, squadra.json, procedure dell'utente
 ```
 
-I nomi dei singoli file possono cambiare: in caso di dubbio cerca nel codice. Le variabili `AMBO_*` non si leggono tutte in `impostazioni.ts`: `AMBO_DATI` e `AMBO_CONSENTI_API` stanno in `ambiente.ts` (e i controlli sulle chiavi API usano quella copia), `AMBO_PORTA` in `server.ts`, quelle della voce in `voce.ts`, `AMBO_AGENTI` in `squadra.ts`, `AMBO_INSIEME` in `produzione.ts`, `AMBO_MOTORE` (solo sviluppo, il motore a cui il server di Vite passa `/api`, solo indirizzi locali) in `web/vite.config.ts`, `AMBO_PAROLE_VIETATE` in `strumenti/controllo-sterile.ts`.
+I nomi dei singoli file possono cambiare: in caso di dubbio cerca nel codice. Le variabili `AMBO_*` non si leggono tutte in `impostazioni.ts`: `AMBO_DATI` e `AMBO_CONSENTI_API` stanno in `ambiente.ts` (e i controlli sulle chiavi API usano quella copia), `AMBO_PORTA` in `server.ts`, quelle della voce in `voce.ts`, `AMBO_AGENTI` in `squadra.ts`, `AMBO_INSIEME` in `produzione.ts`, `AMBO_RAPPORTI_URL` in `rapporti.ts`, `AMBO_MOTORE` (solo sviluppo, il motore a cui il server di Vite passa `/api`, solo indirizzi locali) in `web/vite.config.ts`, `AMBO_PAROLE_VIETATE` in `strumenti/controllo-sterile.ts`.
 
 ## Comandi
 

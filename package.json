@@ -1,6 +1,6 @@
 {
   "name": "ambo",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Chatta con Claude Code e Codex insieme, sul tuo PC, con i tuoi abbonamenti. Solo locale.",
   "type": "module",
   "private": true,

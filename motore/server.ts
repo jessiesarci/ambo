@@ -15,6 +15,7 @@ import { attivo, carica as caricaDibattito, ErroreComando, esegui, riassunto } f
 import { IMPOSTAZIONI, riepilogoImpostazioni, scriviFontiNote } from './impostazioni.ts';
 import { skillDisponibili } from './skill.ts';
 import { eChat, Motore } from './dibattito.ts';
+import { Rapporti, type Scelta } from './rapporti.ts';
 import type { Dibattito, Evento } from './tipi.ts';
 import { AUDIO_MAX, estensioneAudio, Trascrittore } from './voce.ts';
 
@@ -35,7 +36,9 @@ const ORIGINI_AMMESSE = new Set([
 
 // Le fonti delle note (profilo, note, note salvate) per il server MCP che le CLI avviano.
 scriviFontiNote();
-const motore = new Motore();
+// I rapporti d'errore: solo se l'utente li vuole (di serie il programma chiede ogni volta).
+const rapporti = new Rapporti(CARTELLA_DATI);
+const motore = new Motore({ segnala: (e, dove) => rapporti.segnala(e, dove) });
 // I messaggi vocali si trascrivono qui, sul PC (faster-whisper): l'audio non va altrove.
 const voce = new Trascrittore(CARTELLA_DATI);
 motore.setMaxListeners(100);
@@ -117,6 +120,7 @@ const info = () => ({
   // Le skill dell'utente le hanno gli agenti solo con l'ambiente acceso: senza, partono vuoti.
   skill: IMPOSTAZIONI.ambiente ? skillDisponibili() : { claude: [], codex: [] },
   impostazioni: riepilogoImpostazioni(),
+  rapporti: (({ attivi, scelta, inAttesa }) => ({ attivi, scelta, inAttesa: inAttesa.length }))(rapporti.vista()),
 });
 
 function eventi(req: IncomingMessage, res: ServerResponse, id: string): void {
@@ -167,6 +171,7 @@ async function api(req: IncomingMessage, res: ServerResponse, percorso: string[]
   if (risorsa === 'accessi' && metodo === 'GET') return json(res, 200, await accessiRecenti());
   if (risorsa === 'cartelle') return apiCartelle(req, res, id, metodo);
   if (risorsa === 'voce') return apiVoce(req, res, metodo);
+  if (risorsa === 'rapporti') return apiRapporti(req, res, id, azione, metodo);
   if (risorsa === 'chat' && !id && metodo === 'POST') return json(res, 201, comando('chat', undefined, await leggiCorpo(req)));
   if (risorsa !== 'dibattiti') throw new ErroreHttp(404, 'risorsa sconosciuta');
 
@@ -277,6 +282,37 @@ async function apiAllegati(req: IncomingMessage, res: ServerResponse, id: string
 }
 
 // Messaggio vocale: l'audio grezzo nel corpo, il testo nella risposta.
+// I rapporti d'errore in attesa, la scelta (chiedi, sempre, mai) e gli errori della pagina. Tutti i
+// comandi passano dal controllo di Origin come gli altri: una pagina estranea non può mandarli.
+async function apiRapporti(req: IncomingMessage, res: ServerResponse, id: string | undefined, azione: string | undefined, metodo: string): Promise<void> {
+  if (!id && metodo === 'GET') return json(res, 200, rapporti.vista());
+  if (metodo !== 'POST') throw new ErroreHttp(405, 'metodo non ammesso');
+  if (id === 'scelta') {
+    const { scelta } = (await leggiCorpo(req)) as { scelta?: unknown };
+    if (scelta !== 'chiedi' && scelta !== 'sempre' && scelta !== 'mai') throw new ErroreHttp(400, 'scelta non valida: chiedi, sempre o mai');
+    rapporti.scegli(scelta as Scelta);
+    return json(res, 200, rapporti.vista());
+  }
+  if (id === 'pagina') {
+    rapporti.segnalaDaPagina(await leggiCorpo(req));
+    return json(res, 200, { ok: true });
+  }
+  if (!id || !/^[0-9a-f]{16}$/.test(id)) throw new ErroreHttp(404, 'rapporto sconosciuto');
+  if (azione === 'manda') {
+    const { sempre } = (await leggiCorpo(req)) as { sempre?: unknown };
+    const esito = await rapporti.manda(id, sempre === true);
+    if (!esito) throw new ErroreHttp(404, 'rapporto non trovato');
+    if (esito === 'errore') throw new ErroreHttp(502, 'Il rapporto non è partito: il servizio non risponde. Resta qui, riprova più tardi.');
+    if (esito === 'limite') throw new ErroreHttp(429, 'Oggi sono già partiti 20 rapporti: questo resta qui, riprova domani.');
+    return json(res, 200, { ...rapporti.vista(), esito });
+  }
+  if (azione === 'scarta') {
+    if (!rapporti.scarta(id)) throw new ErroreHttp(404, 'rapporto non trovato');
+    return json(res, 200, rapporti.vista());
+  }
+  throw new ErroreHttp(404, 'azione sconosciuta');
+}
+
 async function apiVoce(req: IncomingMessage, res: ServerResponse, metodo: string): Promise<void> {
   if (metodo === 'GET') return json(res, 200, voce.stato());
   if (metodo !== 'POST') throw new ErroreHttp(405, 'metodo non ammesso');
@@ -347,7 +383,13 @@ function statico(req: IncomingMessage, res: ServerResponse, percorso: string): v
     res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' });
     return void res.end('La UI non è ancora compilata: lancia `npm run build` e ricarica.');
   }
-  let file = resolve(WEB, `.${decodeURIComponent(percorso)}`);
+  let decodificato: string;
+  try {
+    decodificato = decodeURIComponent(percorso);
+  } catch {
+    throw new ErroreHttp(400, 'indirizzo non valido');
+  }
+  let file = resolve(WEB, `.${decodificato}`);
   if (file !== WEB && !file.startsWith(WEB + sep)) file = join(WEB, 'index.html');
   if (!existsSync(file) || statSync(file).isDirectory()) file = join(WEB, 'index.html');
   const immutabile = file.includes(`${sep}assets${sep}`);
@@ -381,7 +423,13 @@ const server = createServer(async (req, res) => {
     statico(req, res, url.pathname);
   } catch (e) {
     const codice = e instanceof ErroreHttp ? e.codice : 500;
-    if (codice === 500) console.error(e);
+    if (codice === 500) {
+      console.error(e);
+      // Solo gli errori delle API chieste dalla dashboard: una pagina estranea che fa partire una
+      // richiesta qui (un'immagine, un link) non deve poter far nascere rapporti.
+      const daFuori = req.headers['sec-fetch-site'] !== undefined && req.headers['sec-fetch-site'] !== 'same-origin';
+      if ((req.url ?? '').startsWith('/api/') && !daFuori) rapporti.segnala(e, 'server');
+    }
     if (!res.headersSent) json(res, codice, { errore: (e as Error).message });
     else res.end();
   }

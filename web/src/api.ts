@@ -1,5 +1,6 @@
 // Chiamate al motore, sullo stesso server locale (http://127.0.0.1:4317): niente parte online.
 import type { Allegato } from '../../motore/allegati.ts';
+import type { EsitoInvio, Rapporto, Scelta, VistaRapporti } from '../../motore/rapporti.ts';
 import type { Agente, ConfigInput, Corrente, Destinatari, Dibattito, Esito, Evento, MembroSquadra, Procedura, StatoDibattito } from '../../motore/tipi.ts';
 
 export interface Info {
@@ -13,7 +14,11 @@ export interface Info {
   skill?: Record<Agente, { nome: string; descrizione: string; fonte: string }[]>; // a disposizione sul PC, in sola lettura
   // Cosa ha configurato chi usa il programma (mai i percorsi).
   impostazioni?: { nome: string | null; profilo: boolean; note: boolean; ambiente: boolean; consentiApi: boolean };
+  // I rapporti d'errore: se si possono mandare, la scelta dell'utente e quanti aspettano un sì.
+  rapporti?: { attivi: boolean; scelta: Scelta; inAttesa: number };
 }
+
+export type { Rapporto, Scelta, VistaRapporti };
 
 // Una chat nuova: il primo messaggio (facoltativo) e le stesse opzioni di una partita.
 export type NuovaChat = Pick<ConfigInput, 'chi' | 'memoria' | 'ricercaWeb' | 'claude' | 'codex' | 'cartella'> & { testo?: string; voce?: boolean };
@@ -70,7 +75,7 @@ export interface Ascolto {
   errore: (messaggio: string) => void;
 }
 
-class ErroreChiamata extends Error {
+export class ErroreChiamata extends Error {
   codice: number;
   constructor(codice: number, messaggio: string) {
     super(messaggio);
@@ -179,6 +184,12 @@ const locale = {
     };
   },
   cartelle: () => chiama<CartellaLocale[]>('cartelle'),
+  rapporti: () => chiama<VistaRapporti>('rapporti'),
+  sceltaRapporti: (scelta: Scelta) => chiama<VistaRapporti>('rapporti/scelta', { scelta }),
+  mandaRapporto: (id: string, sempre = false) => chiama<VistaRapporti & { esito: EsitoInvio }>(`rapporti/${id}/manda`, { sempre }),
+  scartaRapporto: (id: string) => chiama<VistaRapporti>(`rapporti/${id}/scarta`, {}),
+  // Un errore della pagina: il motore lo ripulisce e lo tiene solo se l'utente vuole i rapporti.
+  segnalaPagina: (e: { tipo: string; messaggio: string; stack?: string }) => chiama<{ ok: true }>('rapporti/pagina', e),
   aggiungiCartella: (nome: string, percorso: string) => chiama<{ ok: true }>('cartelle/aggiungi', { nome, percorso }),
   rimuoviCartella: (nome: string) => chiama<{ ok: true }>('cartelle/rimuovi', { nome }),
 };

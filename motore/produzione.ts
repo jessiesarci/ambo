@@ -343,6 +343,7 @@ export async function lavora(d: Dibattito, op: {
   catalogo: Catalogo;
   aggiorna: (testo?: string) => void; // salva il dibattito ed emette l'evento di produzione
   attivita?: (assistente: string, testo: string) => void; // cosa fa l'assistente al lavoro, per la scena
+  segnala?: (e: unknown) => void; // un errore che può essere un difetto, per il rapporto d'errore
 }): Promise<void> {
   const cat = op.catalogo;
   const cantiere = nuovoCantiere(op.dati, d.id);
@@ -584,6 +585,7 @@ export async function lavora(d: Dibattito, op: {
     } else {
       p.stato = 'errore';
       p.errore = (e as Error).message;
+      op.segnala?.(e);
       op.aggiorna(`Produzione ferma per un errore: ${p.errore.split('\n')[0]}`);
     }
   }

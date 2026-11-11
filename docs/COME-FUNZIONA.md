@@ -341,6 +341,30 @@ La trascrizione sul PC usa la lingua di `AMBO_LINGUA_VOCE` (di serie `it`). Con 
 
 La **lettura ad alta voce** delle risposte è la sintesi vocale del browser. Il programma usa solo le voci installate sul PC: se il browser ha solo voci online, non legge e la voce del menu non compare. Toglie il markdown prima di leggere.
 
+## Rapporti d'errore
+
+Il motore (`motore/rapporti.ts`) prepara un rapporto quando un errore sembra un difetto del programma:
+- una chat che si ferma per un errore;
+- una riunione o una produzione ferma per un errore;
+- un errore 500 del server;
+- un errore del codice della pagina, che la dashboard gli passa e che lui ripulisce.
+
+Restano fuori le CLI non collegate, i crediti a consumo, i limiti di quota, la sessione scaduta, gli arresti di sicurezza (strumento non ammesso, scrittura fuori dal cantiere, cartella dei dati in AppData), gli stop, gli errori di rete della pagina, gli errori della pagina senza un punto del codice del programma (estensioni, script esterni) e le richieste rifiutate (per esempio un allegato non accettato). Un errore 500 diventa rapporto solo se nasce da una richiesta alle API fatta dalla dashboard.
+
+- **Il rapporto** ha campi fissi: versione, sistema, versione di Node, dove, tipo, una riga di messaggio (al massimo 300 caratteri), fino a 12 punti del codice del programma (funzione e file:riga:colonna, solo dalle righe dello stack che indicano un file del programma) e un'impronta per raggruppare gli errori uguali. Sul PC ha anche un id a caso e l'ora, che non partono.
+- **Il messaggio**: per gli errori delle CLI è fisso per tipo (il loro testo può contenere pezzi di risposte). Per gli altri è la prima riga, da cui si tolgono:
+  - ogni testo tra virgolette di qualsiasi tipo, salvo il nome della proprietà in `(reading 'x')`;
+  - tutto quello che segue l'inizio di un percorso e ogni parola con una barra (dei file del programma resta il percorso relativo);
+  - le email e i valori che sembrano segreti (con il filtro delle cartelle autorizzate).
+- **La scelta** sta in `dati/rapporti.json`:
+  - **chiedi** (di serie): il rapporto aspetta un sì nella scheda della dashboard, al massimo 10 in attesa, uno per impronta;
+  - **sempre**: parte da solo, al massimo 20 al giorno e la stessa impronta una volta all'ora (i limiti restano nel file anche dopo un riavvio);
+  - **mai**: non si tiene niente.
+- **L'invio** lo fa il motore, con una richiesta `https` al servizio in `AMBO_RAPPORTI_URL` (di serie quello di chi sviluppa Ambo; con `0` tutto spento). Se non riesce, con **Manda** il rapporto resta in attesa e la scheda lo dice; con «sempre» resta solo una riga nel log. Il file si rilegge campo per campo: una voce toccata a mano si scarta.
+- **Il servizio** che li riceve è in `servizio/rapporti`: valida i campi, conta gli errori uguali senza riscrivere il messaggio, ha tetti di 300 errori nuovi all'ora, 1000 al giorno e 20 000 in tutto, non salva l'indirizzo IP e ogni notte cancella gli errori fermi da più di 180 giorni. Su Telegram, se è attivo, manda solo versione, dove, tipo e impronta.
+
+Dettagli per chi usa il programma: [RAPPORTI-ERRORE.md](RAPPORTI-ERRORE.md).
+
 ## Dati salvati
 
 Tutto sta in `dati/` nella cartella del programma (o in `AMBO_DATI`):
@@ -352,11 +376,12 @@ Tutto sta in `dati/` nella cartella del programma (o in `AMBO_DATI`):
 - gli allegati delle chat (`dati/allegati/<id>`), con la copia per ogni partita avviata;
 - le note salvate (`dati/note`, se non scegli un'altra cartella con `AMBO_SALVA_IN`), con le sottocartelle `Decisioni` e `Chat`;
 - l'elenco delle cartelle autorizzate;
+- la scelta sui rapporti d'errore e quelli in attesa di un sì (`rapporti.json`);
 - l'ambiente Python della voce (`dati/voce-venv`), se lo installi.
 
 Su Windows la cartella dei dati non deve stare dentro `AppData` (e il programma neanche): il motore vieta a Claude quella cartella, come quelle delle CLI e delle chiavi SSH, quindi ferma la produzione con un messaggio. Un percorso relativo in `AMBO_DATI` parte dalla cartella del programma.
 
-Niente esce dal PC, salvo quello che le CLI mandano ai rispettivi servizi per rispondere. Questo include i messaggi, il contesto della chat e quello che gli agenti leggono: profilo, note, copie delle cartelle autorizzate, allegati, file del cantiere. Con la ricerca web accesa, anche le ricerche che fanno gli agenti. Con la dettatura del browser, l'audio passa dai servizi del browser.
+Niente esce dal PC, salvo quello che le CLI mandano ai rispettivi servizi per rispondere e i rapporti d'errore che decidi di mandare. Questo include i messaggi, il contesto della chat e quello che gli agenti leggono: profilo, note, copie delle cartelle autorizzate, allegati, file del cantiere. Con la ricerca web accesa, anche le ricerche che fanno gli agenti. Con la dettatura del browser, l'audio passa dai servizi del browser.
 
 Le CLI tengono anche la loro cronologia delle sessioni nelle proprie cartelle, come fanno sempre.
 

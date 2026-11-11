@@ -21,7 +21,7 @@ Ambo è un programma che gira sul tuo PC e si usa dal browser. Ti fa chattare co
 - **Ufficio 3D.** Un ufficio diviso in reparti, con gli omini dei capi reparto e degli assistenti: vedi chi pensa, chi cerca nelle note, chi scrive, chi lavora a un incarico. Nel magazzino la catena di montaggio segue la produzione stazione per stazione. Sul computer sta in un riquadro accanto alla plancia e si ingrandisce con un tasto.
 - **Voce** (facoltativa). Detti i messaggi; la trascrizione può restare sul PC.
 
-Il programma non ha una parte online, non ha account suoi e non raccoglie dati di uso. Il server ascolta solo sul tuo PC (127.0.0.1).
+Il programma non ha una parte online, non ha account suoi e non raccoglie dati di uso. Il server ascolta solo sul tuo PC (127.0.0.1). L'unica cosa che può partire dal programma, oltre a quello che le CLI mandano ai loro servizi, è un rapporto d'errore tecnico, e solo se dici sì: vedi [Rapporti d'errore](docs/RAPPORTI-ERRORE.md).
 
 Non ci sono screenshot in questo repository.
 
@@ -301,6 +301,7 @@ La configurazione sta nel file `.env` nella cartella del programma. Copialo da [
 | `AMBO_AGENTI` | Solo con `AMBO_AMBIENTE=1`: la cartella da cui prendere gli agenti della squadra, oppure `0` per non prenderne nessuno | `~/.claude/agents` |
 | `AMBO_CONSENTI_API` | Con `1` accetta anche il login con chiave API (fatturazione a consumo), per Claude Code e per Codex. Non permette i crediti extra di Claude: quelli il programma li ferma sempre | spento |
 | `AMBO_PORTA` | Porta del server | `4317` |
+| `AMBO_RAPPORTI_URL` | Dove vanno i rapporti d'errore, se li mandi. Con `0` sono spenti del tutto. Solo indirizzi `https://`, o locali per le prove (vedi [Rapporti d'errore](docs/RAPPORTI-ERRORE.md)) | il servizio di chi sviluppa Ambo |
 | `AMBO_INSIEME` | Quanti pacchetti di produzione si costruiscono nello stesso momento, da 1 (uno dopo l'altro) a 4. Più pacchetti insieme consumano più quota nello stesso momento | `3` |
 | `AMBO_DATI` | Cartella dei dati. Non metterla dentro `AppData` su Windows: lì Claude non può scrivere e la produzione si ferma con un messaggio (vale anche se tutto il programma sta dentro `AppData`) | `./dati` |
 | `CLAUDE_BIN` | Percorso di Claude Code, se il programma non lo trova da solo: l'eseguibile, oppure (installazione npm) il `cli.js` di Claude Code nella cartella `node_modules` globale | cercato da solo |
@@ -460,6 +461,10 @@ In cima alla chat c'è la **squadra in campo**: Claude, Codex e gli assistenti c
 
 **Plancia.** Sul computer (da 1024 px di larghezza) accanto alla chat c'è la plancia: una scheda per lavoro con la copertina (la pagina o il documento prodotto), lo stato e le tappe: prima i lavori di questa chat, poi gli ultimi altri lavori al lavoro o con una produzione (al massimo 8). L'ufficio 3D sta in un riquadro in alto a destra; con il tasto per ingrandirlo torna a fare da sfondo, e con "Torna alla plancia" torna nel riquadro.
 
+### Rapporti d'errore
+
+Quando nel programma si rompe qualcosa, compare una scheda che chiede se mandare il rapporto a chi sviluppa Ambo. Con **Cosa contiene** lo vedi così come partirebbe: versione, sistema, dove e che tipo di errore, la prima riga del messaggio ripulita e i punti del codice del programma. Mai chat, file, note o percorsi. Scegli **Manda**, **Manda sempre** o **Non mandare**; dal menu ⋯ della chat, alla voce **Rapporti d'errore**, cambi idea quando vuoi. Login mancante, crediti a consumo, limiti di quota, sessione scaduta e arresti di sicurezza non diventano rapporti; degli errori delle CLI parte solo un messaggio fisso per tipo. Chi li riceve, dove stanno e per quanto: [docs/RAPPORTI-ERRORE.md](docs/RAPPORTI-ERRORE.md).
+
 ### Voce
 
 La voce è facoltativa.
@@ -539,6 +544,7 @@ I token si vedono cliccando una risposta (o sempre, con «Mostra tempi e token»
 - In produzione gli assistenti scrivono solo nel cantiere: lo impongono le regole dei permessi di Claude Code e il motore ferma il lavoro se vede una scrittura fuori.
 - Note, cartelle e allegati sono trattati come dati, non come istruzioni. Gli allegati si riconoscono dal contenuto, gli SVG si rifiutano e le foto perdono i metadati.
 - Le anteprime delle pagine prodotte stanno in una cornice senza permessi e con una CSP sua: niente script, niente moduli, niente richieste, né verso la rete né verso il programma.
+- Un rapporto d'errore parte solo con il tuo sì (o se hai scelto «manda sempre»), con campi fissi e ripuliti. Con `AMBO_RAPPORTI_URL=0` sono spenti.
 
 Non è una sandbox del sistema operativo: si appoggia ai sistemi di permessi delle CLI. Dettagli in [SECURITY.md](SECURITY.md).
 

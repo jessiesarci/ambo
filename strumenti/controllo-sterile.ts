@@ -72,7 +72,8 @@ const PAROLE = (process.env.AMBO_PAROLE_VIETATE ?? '').split(',').map((p) => p.t
 // Le eccezioni note, con il motivo: il controllo stesso contiene gli schemi che cerca, e il filtro
 // dei segreti delle cartelle autorizzate ha uno schema che assomiglia a un indirizzo con password.
 const ECCEZIONI = new Set(['strumenti/controllo-sterile.ts']);
-const ECCEZIONI_PER_CONTROLLO: Record<string, string[]> = { 'motore/cartelle.ts': ['indirizzo con password'] };
+// I rapporti d'errore vanno al servizio di chi sviluppa Ambo: il suo indirizzo Supabase è voluto.
+const ECCEZIONI_PER_CONTROLLO: Record<string, string[]> = { 'motore/cartelle.ts': ['indirizzo con password'], 'motore/rapporti.ts': ['progetto Supabase'] };
 
 const problemi: string[] = [];
 for (const rel of elenco()) {

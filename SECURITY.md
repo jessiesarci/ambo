@@ -36,6 +36,7 @@ Il codice di questo repository, per esempio:
 - le anteprime dei file prodotti: una pagina del cantiere che riesce a eseguire script, a fare richieste o a uscire dalla sua cornice;
 - "Apri la cartella": un modo per far aprire al programma una cartella fuori da `dati/cantieri`;
 - l'iniezione di istruzioni (prompt injection) da note, cartelle, chat o risultati della ricerca web **quando aggira un controllo del programma**, per esempio facendo scrivere file o usare strumenti che non dovrebbero esserci;
+- i rapporti d'errore: un rapporto che parte senza il sì dell'utente (o con la scelta «mai», o con `AMBO_RAPPORTI_URL=0`), o che porta dati diversi dai campi fissi (testi della chat, contenuti di file, percorsi, nomi);
 - un modo per dare agli agenti accesso alla rete oltre al loro servizio e alla ricerca web della partita, o la ricerca web attiva dove dovrebbe essere spenta;
 - le dipendenze npm usate dal programma, se la falla si può sfruttare nel modo in cui le usa.
 
@@ -49,7 +50,7 @@ Il codice di questo repository, per esempio:
 
 ## Modello di sicurezza in breve
 
-**Solo locale.** Il server ascolta solo su 127.0.0.1. Risponde solo a richieste indirizzate a sé stesso (Host) e accetta comandi solo dalle sue pagine (Origin), contro DNS rebinding e CSRF. Niente parte online, niente account del programma, niente telemetria.
+**Solo locale.** Il server ascolta solo su 127.0.0.1. Risponde solo a richieste indirizzate a sé stesso (Host) e accetta comandi solo dalle sue pagine (Origin), contro DNS rebinding e CSRF. Niente parte online, niente account del programma, niente telemetria. L'unica eccezione sono i rapporti d'errore, sotto.
 
 **Credenziali.** Il programma non legge i file delle credenziali delle CLI. Chiede alle CLI con che tipo di login sono collegate. Il login si fa con il flusso ufficiale di ciascuna CLI.
 
@@ -73,6 +74,8 @@ Il codice di questo repository, per esempio:
 
 **Apri la cartella.** Il server apre in Esplora risorse (o nel Finder, o con `xdg-open`) solo la cartella del cantiere della partita, e solo se sta dentro `dati/cantieri`. Il percorso viene dalla partita, non dalla richiesta.
 
+**Rapporti d'errore.** È l'unica richiesta del programma verso un servizio che non è una CLI. La prepara e la manda il motore, mai la pagina, e solo con la scelta dell'utente: «chiedi» di serie (il rapporto aspetta un sì), «sempre» o «mai». Il rapporto ha campi fissi: versione, sistema, versione di Node, dove, tipo, una riga di messaggio, punti del codice del programma e impronta (id e ora restano sul PC). Gli errori delle CLI hanno un messaggio fisso per tipo; dagli altri si tolgono ogni testo tra virgolette, tutto quello che segue l'inizio di un percorso, le parole con una barra, le email e i valori che sembrano segreti. Dello stack restano solo le righe dei file del programma. Il file dei rapporti in attesa si rilegge campo per campo. Niente identifica l'utente o l'installazione. L'indirizzo deve essere `https://` (o locale, per le prove); con `AMBO_RAPPORTI_URL=0` tutto è spento. I comandi dei rapporti passano dal controllo di Origin come gli altri, e un errore del server diventa rapporto solo se nasce da una richiesta alle API fatta dalla dashboard stessa (una pagina estranea che punta al server non ne fa nascere). Il servizio che li riceve (`servizio/rapporti`) accetta solo campi della forma prevista, ha tetti all'ora, al giorno e in totale dentro una transazione con un lucchetto, non riscrive i messaggi salvati, non salva l'indirizzo IP e ogni notte cancella gli errori fermi da più di 180 giorni. Dettagli in [docs/RAPPORTI-ERRORE.md](docs/RAPPORTI-ERRORE.md).
+
 **Dashboard.** La dashboard ha una Content Security Policy stretta: carica solo risorse del server locale.
 
 ### Limiti
@@ -80,6 +83,7 @@ Il codice di questo repository, per esempio:
 - Non è una sandbox del sistema operativo. Il programma si appoggia ai sistemi di permessi delle CLI e aggiunge i suoi controlli.
 - Il filtro dei segreti riconosce i formati più comuni, non tutti. Non autorizzare cartelle che contengono segreti.
 - Quello che gli agenti leggono va ai servizi di Anthropic e di OpenAI tramite le CLI.
+- La pulizia del rapporto d'errore lavora su regole: un messaggio d'errore può contenere qualcosa che non prevede. Con «chiedi» (di serie) il rapporto si vede prima di mandarlo; con «sempre» no.
 - Con la ricerca web accesa, una pagina trovata sul web può contenere istruzioni ostili. Gli strumenti restano limitati (niente scrittura, niente comandi), ma il modello può esserne influenzato nelle risposte.
 - La dettatura del browser passa dai servizi online del browser (Google o Apple). La trascrizione sul PC no, e la lettura ad alta voce usa solo le voci installate sul PC.
 - Il consumo della quota dei tuoi abbonamenti è reale, e cresce con gli incarichi della squadra, i pacchetti (anche più insieme), le revisioni e il riepilogo di fine lavoro.
